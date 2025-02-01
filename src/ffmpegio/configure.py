@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Any
 from collections.abc import Sequence
 
 import re, logging
@@ -15,71 +15,69 @@ from .errors import FFmpegioError
 UrlType = Literal["input", "output"]
 
 
-def array_to_video_input(rate, data, stream_id=None, **opts):
+def array_to_video_input(
+    rate: int | float | Fraction | None = None,
+    data: Any | None = None,
+    pipe_id: str | None = None,
+    **opts,
+) -> tuple[str, dict]:
     """create an stdin input with video stream
 
     :param rate: input frame rate in frames/second
-    :type rate: int, float, or `fractions.Fraction`
     :param data: input video frame data, accessed with `video_info` plugin hook, defaults to None (manual config)
-    :type data: object
-    :param stream_id: video stream id ('v:#'), defaults None to set the options to be file-wide ('v')
-    :type stream_id: int, optional
+    :param pipe_id: named pipe path, defaults None to use stdin
     :param **opts: input options
-    :type **opts: dict
     :return: tuple of input url and option dict
-    :rtype: tuple(str, dict)
     """
 
-    spec = "" if stream_id is None else ":" + utils.stream_spec(stream_id, "v")
+    if rate is None and "r" not in opts:
+        raise ValueError("rate argument must be specified if opts['r'] is not given.")
 
     s, pix_fmt = utils.guess_video_format(*plugins.get_hook().video_info(obj=data))
 
     return (
-        "-",
+        pipe_id or "-",
         {
             "f": "rawvideo",
-            f"c{spec or ':v'}": "rawvideo",
-            f"s{spec}": s,
-            f"r{spec}": rate,
-            f"pix_fmt{spec}": pix_fmt,
+            f"c:v": "rawvideo",
+            f"s": s,
+            f"r": rate,
+            f"pix_fmt": pix_fmt,
             **opts,
         },
     )
 
 
 def array_to_audio_input(
-    rate,
-    data=None,
-    stream_id=None,
-    **opts,
+    rate: int | None = None,
+    data: Any | None = None,
+    pipe_id: str | None = None,
+    **opts: dict[str, Any],
 ):
     """create an stdin input with audio stream
 
     :param rate: input sample rate in samples/second
-    :type rate: int
     :param data: input audio data, accessed by `audio_info` plugin hook, defaults to None (manual config)
-    :type data: object
-    :param stream_id: audio stream id ('a:#'), defaults to None to set the options to be file-wide ('a')
-    :type stream_id: int, optional
+    :param pipe_id: input named pipe id, defaults to None to use the stdin
     :return: tuple of input url and option dict
-    :rtype: tuple(str, dict)
     """
+
+    if rate is None and "ar" not in opts:
+        raise ValueError("rate argument must be specified if opts['ar'] is not given.")
 
     shape = dtype = None
     shape, dtype = plugins.get_hook().audio_info(obj=data)
     sample_fmt, ac = utils.guess_audio_format(dtype, shape)
     codec, f = utils.get_audio_codec(sample_fmt)
 
-    spec = "" if stream_id is None else ":" + utils.stream_spec(stream_id, "a")
-
     return (
-        "-",
+        pipe_id or "-",
         {
             "f": f,
-            f"c{spec or ':a'}": codec,
-            f"ac{spec}": ac,
-            f"ar{spec}": rate,
-            f"sample_fmt{spec}": sample_fmt,
+            f"c:a": codec,
+            f"ac": ac,
+            f"ar": rate,
+            f"sample_fmt": sample_fmt,
             **opts,
         },
     )
