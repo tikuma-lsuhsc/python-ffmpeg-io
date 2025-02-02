@@ -145,12 +145,6 @@ def compose(args, command="", shell_command=False):
     def finalize_output(key, val):
         if re.match(r"s(?:\:|$)", key) and not isinstance(val, str):
             val = "x".join((str(v) for v in val))
-        elif key == "map" and not isinstance(val, str):
-            # if an entry is a seq, join with ':'
-            val = [
-                v if isinstance(v, str) else ":".join((str(vi) for vi in v))
-                for v in val
-            ]
         return key, val
 
     def finalize_input(key, val):
