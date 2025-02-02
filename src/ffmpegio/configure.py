@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from typing import Literal, Any
+from .utils.typing import Literal, Any, FFmpegArgs, StreamSpec
 from collections.abc import Sequence
+
+from fractions import Fraction
 
 import re, logging
 
@@ -751,3 +753,77 @@ def add_urls(
 
     ret = process_one(urls)
     return [process_one(url) for url in urls] if ret is None else [ret]
+
+
+def add_filtergraph(
+    args: FFmpegArgs,
+    filtergraph: Graph,
+    map: Sequence[StreamSpec] | None = None,
+    automap: bool = True,
+    append_filter: bool = True,
+    append_map: bool = True,
+    ofile: int = 0,
+):
+    """add a complex filtergraph to FFmpeg arguments
+
+    :param args: FFmpeg argument dict (to be modified in place)
+    :param filtergraph: Filtergraph to be added to the FFmpeg arguments
+    :param map: output stream mapping, usually the output pad label, defaults to None
+    :param automap: True to auto map all the output pads of the filtergraph IF `map` is None, defaults to True.
+    :param append_filter: True to append `filtergraph` to the `filter_complex` global option if exists, False to replace, defaults to True
+    :param append_map: True to append `map` to the `map` output option if exists, False to replace, defaults to True
+    :param ofile: output file id, defaults to 0
+
+    """
+
+    if len(args["outputs"]) <= ofile:
+        raise ValueError(
+            f"The specified output #{ofile} is not defined in the FFmpegArgs dict."
+        )
+
+    if automap and map is None:
+        map = [f"[{l[0]}]" for l in filtergraph.iter_output_labels()]
+
+    # add the merging filter graph to the filter_complex argument
+    gopts = args.get("global_options", None)
+
+    if append_filter:
+        complex_filters = None if gopts is None else gopts.get("filter_complex", None)
+        if complex_filters is None:
+            complex_filters = filtergraph
+        else:
+            complex_filters = (
+                [complex_filters]
+                if isinstance(complex_filters, Sequence)
+                and not isinstance(complex_filters, Sequence)
+                else [*complex_filters]
+            )
+            complex_filters.append(filtergraph)
+    else:
+        complex_filters = filtergraph
+
+    if gopts is None:
+        args["global_options"] = {"filter_complex": complex_filters}
+    else:
+        gopts["filter_complex"] = complex_filters
+
+    if not len(map):
+        # nothing to map
+        return
+
+    outopts = args["outputs"][ofile][1]
+    if outopts is None:
+        args["outputs"][ofile] = (args["outputs"][ofile][0], {"map": map})
+    else:
+        if append_map and "map" in outopts:
+
+            existing_map = outopts["map"]
+
+            # remove merged streams from output map & append the output stream of the filter
+            map = (
+                [existing_map, *map]
+                if isinstance(existing_map, str) or not isinstance(existing_map, Sequence)
+                else [*existing_map, *map]
+            )
+
+        outopts['map'] = map
