@@ -447,6 +447,29 @@ class Filter(fgb.abc.FilterGraphObject, tuple):
             else inc()
         )
 
+    def normalize_pad_index(self, input: bool, index: PAD_INDEX) -> PAD_INDEX:
+        """normalize pad index.
+
+        Returns three-element pad index with non-negative indices.
+
+        :param input: True to check the input pad index, False the output.
+        :param index: pad index to be normalized
+        :return: normalized pad index
+        """
+
+        if isinstance(index, int):
+            index = (0, 0, index)
+        elif len(index) == 1:
+            index = (0, 0, *index)
+        elif len(index) == 2:
+            index = (0, *index)
+
+        if index[-1] < 0:
+            numpads = self.get_num_inputs() if input else self.get_num_outputs()
+            index = (*index[-3:-1], numpads + index[-1])
+
+        return index
+
     def get_num_filters(self, chain: int) -> int:
         """get the number of filters of the specfied chain
 

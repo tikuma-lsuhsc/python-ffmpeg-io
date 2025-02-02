@@ -262,6 +262,17 @@ class FilterGraphObject(ABC):
     def _get_label(self, input: bool, index: PAD_INDEX):
         return None
 
+    @abstractmethod
+    def normalize_pad_index(self, input: bool, index: PAD_INDEX) -> PAD_INDEX:
+        """normalize pad index.
+
+        Returns three-element pad index with non-negative indices.
+
+        :param input: True to check the input pad index, False the output.
+        :param index: pad index to be normalized
+        :return: normalized pad index
+        """
+
     def get_input_pad(
         self, index_or_label: PAD_INDEX | str
     ) -> tuple[PAD_INDEX, str | None]:

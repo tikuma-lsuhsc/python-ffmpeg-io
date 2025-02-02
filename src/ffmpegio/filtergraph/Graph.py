@@ -210,7 +210,30 @@ class Graph(fgb.abc.FilterGraphObject, UserList):
             chainable_first=chainable_first,
         )
 
+    def normalize_pad_index(self, input: bool, index: PAD_INDEX) -> PAD_INDEX:
+        """normalize pad index.
+
+        Returns three-element pad index with non-negative indices.
+
+        :param input: True to check the input pad index, False the output.
+        :param index: pad index to be normalized
+        :return: normalized pad index
+        """
+
+        if isinstance(index, int):
+            index = (0, 0, index)
+        elif len(index) == 1:
+            index = (0, 0, *index)
+        elif len(index) == 2:
+            index = (0, *index)
+        elif index[-3] < 0:
+            index = (len(self) + index[-3], *index[-2:])
+
+        return self[index[0]].normalize_pad_index(input, index)
+
     def _get_label(self, input: bool, index: PAD_INDEX):
+
+        index = self.normalize_pad_index(input, index)
 
         return getattr(
             self._links, "find_inpad_label" if input else "find_outpad_label"

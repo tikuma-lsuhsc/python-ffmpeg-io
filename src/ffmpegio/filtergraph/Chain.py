@@ -121,6 +121,28 @@ class Chain(fgb.abc.FilterGraphObject, UserList):
         """Returns True if the given id is the last filter of the chain"""
         return filter_id == len(self) - 1
 
+    def normalize_pad_index(self, input: bool, index: PAD_INDEX) -> PAD_INDEX:
+        """normalize pad index.
+
+        Returns three-element pad index with non-negative indices.
+
+        :param input: True to check the input pad index, False the output.
+        :param index: pad index to be normalized
+        :return: normalized pad index
+        """
+
+        if isinstance(index, int):
+            index = (0, 0, index)
+        elif len(index) == 1:
+            index = (0, 0, *index)
+        else:
+            if len(index) == 2:
+                index = (0, *index)
+            if index[-2] < 0:
+                index = (index[-3], len(self) + index[-2], index[-1])
+
+        return self[index[1]].normalize_pad_index(input, index)
+
     def add_label(
         self,
         label: str,
