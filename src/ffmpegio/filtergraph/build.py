@@ -183,15 +183,15 @@ def join(
 
 
 def attach(
-    left: fgb.Filter | fgb.Chain | str | list[fgb.Filter | fgb.Chain | str],
-    right: fgb.Filter | fgb.Chain | str | list[fgb.Filter | fgb.Chain | str],
+    left: fgb.abc.FilterGraphObject | str | list[fgb.abc.FilterGraphObject | str],
+    right: fgb.abc.FilterGraphObject | str | list[fgb.abc.FilterGraphObject | str],
     left_on: PAD_INDEX | str | list[PAD_INDEX | str | None] | None = None,
     right_on: PAD_INDEX | str | list[PAD_INDEX | str | None] | None = None,
 ) -> fgb.Graph:
     """attach filter(s), chain(s), or label(s) to a filtergraph object
 
     :param left: input filtergraph object, filtergraph expression, or label, or list thereof
-    :param right: output filterchain, filtergraph expression, or label, or list thereof.
+    :param right: output filtergraph object, filtergraph expression, or label, or list thereof.
     :param left_on: pad_index, specify the pad on left, default to None (first available)
     :param right_on: pad index, specifies which pad on the right graph, defaults to None (first available)
     :param right_first: True to preserve the chain indices of the right filtergraph object, defaults
@@ -221,10 +221,6 @@ def attach(
     def analyze_fgobj(obj):
         attach_obj = isinstance(obj, list)
         obj = [check_obj(o) for o in obj] if attach_obj else check_obj(obj)
-        if attach_obj and any(isinstance(o, fgb.Graph) for o in obj):
-            raise ValueError(
-                "Filtergraph object list cannot include any Graph object. Only Filter and Chain objects are allowed."
-            )
         if isinstance(obj, str):
             attach_obj = True
             obj = [obj]
