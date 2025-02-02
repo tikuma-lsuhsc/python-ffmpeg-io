@@ -1,52 +1,60 @@
-from ffmpegio import media
+from tempfile import TemporaryDirectory
+from os import path
+from pprint import pprint
+
+import ffmpegio as ff
 
 
 def test_media_read():
     url = "tests/assets/testmulti-1m.mp4"
     url1 = "tests/assets/testvideo-1m.mp4"
     url2 = "tests/assets/testaudio-1m.mp3"
-    rates, data = media.read(url, t=1)
-    rates, data = media.read(url, map=("v:0", "v:1", "a:1", "a:0"), t=1)
-    rates, data = media.read(url1, url2, t=1)
-    rates, data = media.read(url2, url, map=("1:v:0", (0, "a:0")), t=1)
+    rates, data = ff.media.read(url, t=1)
+    rates, data = ff.media.read(url, map=("v:0", "v:1", "a:1", "a:0"), t=1)
+    rates, data = ff.media.read(url1, url2, t=1)
+    rates, data = ff.media.read(url2, url, map=("1:v:0", (0, "a:0")), t=1)
 
     print(rates)
-    print([(k, x['shape'], x['dtype']) for k, x in data.items()])
+    print([(k, x["shape"], x["dtype"]) for k, x in data.items()])
 
 
-if __name__ == "__main__":
-    from matplotlib import pyplot as plt
+def test_media_write():
+    fs, x = ff.audio.read("tests/assets/testaudio-1m.mp3")
 
-    pass
-    # out = ffmpegprocess.run(
-    #     {
-    #         "inputs": [(url, None)],
-    #         "outputs": [
-    #             (
-    #                 "-",
-    #                 {
-    #                     "ss": 0.1,
-    #                     "t": 1,
-    #                     "f": "avi",
-    #                     "c:v": "rawvideo",
-    #                     "pix_fmt": "ya8",
-    #                     "c:a": "pcm_f32le",
-    #                     "sample_fmt": "flt",
-    #                 },
-    #             )
-    #         ],
-    #         "global_options": None,
-    #     },
-    #     capture_log=False,
-    # )
-    # reader = avi.AviReader(BytesIO(out.stdout), True)
-    # print(reader.streams)
-    # n = len(reader.streams)
-    # out = {v["spec"]: [] for v in reader.streams.values()}
-    # for st, data in reader:
-    #     out[st].append(data)
-    # out = {k: np.concatenate(v) for k, v in out.items()}
-    # print({k: (v.shape, v.dtype) for k, v in out.items()})
+    fps, F = ff.video.read("tests/assets/testvideo-1m.mp4", vframes=120)
 
-    # plt.imshow(out["v:0"][0, ..., 0], alpha=out["v:0"][0, ..., 1]/255)
-    # plt.show()
+    outext = ".mp4"
+
+    print(f"video: {len(F['buffer'])} bytes | audio: {len(x['buffer'])} bytes")
+
+    with TemporaryDirectory() as tmpdirname:
+        outfile = path.join(tmpdirname, f"out{outext}")
+        ff.media.write(
+            outfile, "va", (fps, F), (fs, x), show_log=True, shortest=ff.FLAG
+        )
+
+        pprint(ff.probe.format_basic(outfile))
+        pprint(ff.probe.streams_basic(outfile))
+
+
+def test_media_write_audio_merge():
+    stream1 = ff.audio.read("tests/assets/testaudio-1m.mp3", ar=8000, sample_fmt="s16")
+    stream2 = ff.audio.read("tests/assets/testaudio-1m.mp3", ar=16000, sample_fmt="flt")
+    stream3 = ff.audio.read("tests/assets/testaudio-1m.mp3", ar=4000, sample_fmt="dbl")
+
+    outext = ".wav"
+
+    with TemporaryDirectory() as tmpdirname:
+        outfile = path.join(tmpdirname, f"out{outext}")
+        ff.media.write(
+            outfile,
+            "aaa",
+            stream1,
+            stream2,
+            stream3,
+            merge_audio_streams=True,
+            show_log=True,
+            shortest=ff.FLAG,
+        )
+        pprint(ff.probe.format_basic(outfile))
+        pprint(ff.probe.audio_streams_basic(outfile))
