@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from typing_extensions import Unpack
 from collections.abc import Sequence
-from .utils.typing import Literal, Any, RawStreamDef, ProgressCallable
+from .utils.typing import (
+    Literal,
+    Any,
+    RawStreamDef,
+    ProgressCallable,
+    RawDataBlob,
+    StreamSpec,
+)
 
 import contextlib
 from io import BytesIO
@@ -20,39 +27,36 @@ from .threading import WriterThread
 __all__ = ["read", "write"]
 
 
-def read(*urls, progress=None, show_log=None, **options):
+def read(
+    *urls: * tuple[str],
+    progress: ProgressCallable | None = None,
+    show_log: bool | None = None,
+    **options: Unpack[dict[str, Any]],
+) -> tuple[dict[StreamSpec, Fraction | int], dict[StreamSpec, RawDataBlob]]:
     """Read video and audio frames
 
     :param *urls: URLs of the media files to read.
-    :type *urls: tuple(str)
     :param progress: progress callback function, defaults to None
-    :type progress: callable object, optional
     :param show_log: True to show FFmpeg log messages on the console,
                      defaults to None (no show/capture)
                      Ignored if stream format must be retrieved automatically.
-    :type show_log: bool, optional
     :param use_ya: True if piped video streams uses `ya8` pix_fmt instead of `gray16le`, default to None
-    :type use_ya: bool, optional
-    :param \\**options: FFmpeg options, append '_in[input_url_id]' for input option names for specific
+    :param **options: FFmpeg options, append '_in[input_url_id]' for input option names for specific
                         input url or '_in' to be applied to all inputs. The url-specific option gets the
                         preference (see :doc:`options` for custom options)
-    :type \\**options: dict, optional
-
-    :return: frame rate and video frame data, created by `bytes_to_video` plugin hook
-    :rtype: (`fractions.Fraction`, object)
+    :return: frame/sampling rates and raw data for each requested stream
 
     Note: Only pass in multiple urls to implement complex filtergraph. It's significantly faster to run
           `ffmpegio.video.read()` for each url.
 
+    Specify the streams to return by `map` output option:
+
+        map = ['0:v:0','1:a:3'] # pick 1st file's 1st video stream and 2nd file's 4th audio stream
 
     Unlike :py:mod:`video` and :py:mod:`image`, video pixel formats are not autodetected. If output
     'pix_fmt' option is not explicitly set, 'rgb24' is used.
 
     For audio streams, if 'sample_fmt' output option is not specified, 's16'.
-
-
-    streams = ['0:v:0','1:a:3'] # pick 1st file's 1st video stream and 2nd file's 4th audio stream
-
     """
 
     ninputs = len(urls)
@@ -218,11 +222,7 @@ def write(
 
         pipes.append((pipe, byte_data))
 
-        configure.add_url(
-            ffmpeg_args,
-            "input",
-            *in_args,
-        )
+        configure.add_url(ffmpeg_args, "input", *in_args)
 
     # map all input streams to output unless user specifies the mapping
     map = options["map"] if "map" in options else list(range(n_in))
