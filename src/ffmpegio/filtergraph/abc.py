@@ -253,7 +253,7 @@ class FilterGraphObject(ABC):
             return self._get_label(input, index)
         if inpad is not None:
             return self._get_label(True, inpad)
-        if (outpad is not None) != 1:
+        if outpad is not None:
             return self._get_label(False, outpad)
         raise ValueError(
             "One and only one of index, inpad, or outpad must be specified."
