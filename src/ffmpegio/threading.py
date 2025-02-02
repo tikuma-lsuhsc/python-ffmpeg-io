@@ -2,6 +2,9 @@
 """
 
 from __future__ import annotations
+
+from typing import BinaryIO
+
 from copy import deepcopy
 import re, os
 from threading import Thread, Condition, Lock, Event
@@ -11,6 +14,8 @@ from tempfile import TemporaryDirectory
 from queue import Empty, Full, Queue
 from math import ceil
 import logging
+
+from namedpipe import NPopen
 
 logger = logging.getLogger("ffmpegio")
 
@@ -430,17 +435,16 @@ class WriterThread(Thread):
     """a thread to write byte data to a writable stream
 
     :param stdin: stream to write data to
-    :type stdin: writable stream
     :param queuesize: depth of a queue for inter-thread data transfer, defaults to None
-    :type queuesize: int, optional
+    :param bufsize: maximum number of bytes to write at once, defaults to None (1048576 bytes)
     """
 
-    def __init__(self, stdin, queuesize=None):
+    def __init__(self, stdin: BinaryIO | NPopen, queuesize: int | None = None):
         super().__init__()
         self.stdin = stdin  #:writable stream: data sink
         self._queue = Queue(queuesize or 0)  # inter-thread data I/O
 
-    def join(self, timeout=None):
+    def join(self, timeout: float | None = None):
         # close the stream if not already closed
         self.stdin.close()
 
@@ -460,21 +464,36 @@ class WriterThread(Thread):
         return self
 
     def run(self):
+
+        is_namedpipe = isinstance(self.stdin, NPopen)
+        stream = self.stdin.wait() if is_namedpipe else self.stdin
+
         while True:
             # get next data block
             data = self._queue.get()
             self._queue.task_done()
             if data is None:
+                logger.info(f"writer thread: received a sentinel to stop the writer")
                 break
-            # print(f"writer thread: received {data.shape[0]} samples to write")
+            else:
+                logger.info(f"writer thread: received {len(data)} bytes to write")
+
             try:
-                nbytes = self.stdin.write(data)
-                # print(f"writer thread: written {nbytes} written")
-            except:
+                nwritten = 0
+                nwritten = stream.write(data)
+                logger.info(f"writer thread: written {nwritten} written")
+            except Exception as e:
                 # stdout stream closed/FFmpeg terminated, end the thread as well
+                logger.info(f"writer thread exception: {e}")
                 break
-            if not nbytes and self.stdin.closed:  # just in case
+            if not nwritten and stream.closed:  # just in case
+                logger.info(f"writer thread: somethin' else happened")
                 break
+
+        if is_namedpipe:
+            self.stdin.close()
+
+        logger.info(f"writer thread exiting")
 
     def write(self, data, timeout=None):
         if not self.is_alive():
@@ -564,14 +583,13 @@ class AviReaderThread(Thread):
             )
         return flag
 
-    def readchunk(self, timeout=None):
+    def readchunk(self, timeout=None) -> tuple[str, object]:
         """read the next avi chunk
 
         :param timeout: timeout in seconds, defaults to None (waits indefinitely)
         :type timeout: float, optional
         :raises TimeoutError: if terminated due to timeout
         :return: tuple of stream specifier and data array
-        :rtype: (str, object)
         """
 
         # wait till matching line is read by the thread
@@ -608,7 +626,7 @@ class AviReaderThread(Thread):
 
         return self.reader.streams[id]["spec"], self.reader.from_bytes(id, data)
 
-    def find_id(self, ref_stream):
+    def find_id(self, ref_stream: str) -> object:
         self.wait()
         try:
             return next(
@@ -617,22 +635,19 @@ class AviReaderThread(Thread):
         except:
             ValueError(f"{ref_stream} is not a valid stream specifier")
 
-    def read(self, n=-1, ref_stream=None, timeout=None):
+    def read(
+        self, n: int = -1, ref_stream: str | None = None, timeout: float | None = None
+    ) -> dict[str, bytes]:
         """read data from all streams
 
         :param n: number of samples, negate to non-blocking, defaults to -1
-        :type n: int, optional
         :param ref_stream: stream specifier to count the samples,
                            defaults to None (first stream)
-        :type ref_stream: str, optional
         :param timeout: timeout in seconds, defaults to None (waits indefinitely)
-        :type timeout: float, optional
         :raises TimeoutError: if terminated due to timeout
-        :return: tuple of stream specifier and data array
         :return: dict of data object keyed by stream specifier string, each data object is
                  created by `bytes_to_video` or `bytes_to_image` plugin hook. If all frames
                  have been read, dict items would be all empty
-        :rtype: dict(spec:str, object)
         """
 
         # wait till matching line is read by the thread
@@ -725,7 +740,7 @@ class AviReaderThread(Thread):
 
         return out
 
-    def readall(self, timeout=None):
+    def readall(self, timeout: float | None = None) -> dict[str, bytes]:
         # wait till matching line is read by the thread
         if timeout is not None:
             timeout = time() + timeout
