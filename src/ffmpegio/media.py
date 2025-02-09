@@ -27,13 +27,13 @@ from .threading import WriterThread
 __all__ = ["read", "write"]
 
 
-def read(
+def read_by_avi(
     *urls: * tuple[str],
     progress: ProgressCallable | None = None,
     show_log: bool | None = None,
     **options: Unpack[dict[str, Any]],
-) -> tuple[dict[StreamSpec, Fraction | int], dict[StreamSpec, RawDataBlob]]:
-    """Read video and audio frames
+) -> tuple[dict[StreamSpecDict, Fraction | int], dict[StreamSpecDict, RawDataBlob]]:
+    """Read video and audio frames by AVI reader (old media.read())
 
     :param *urls: URLs of the media files to read.
     :param progress: progress callback function, defaults to None
@@ -79,7 +79,7 @@ def read(
         configure.add_url(args, "input", url, opts)
 
     # configure output options
-    use_ya = configure.finalize_media_read_opts(args)
+    use_ya = configure.finalize_avi_read_opts(args)
 
     # run FFmpeg
     out = ffmpegprocess.run(
