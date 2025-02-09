@@ -35,18 +35,9 @@ def array_to_video_input(
     if rate is None and "r" not in opts:
         raise ValueError("rate argument must be specified if opts['r'] is not given.")
 
-    s, pix_fmt = utils.guess_video_format(*plugins.get_hook().video_info(obj=data))
-
     return (
         pipe_id or "-",
-        {
-            "f": "rawvideo",
-            f"c:v": "rawvideo",
-            f"s": s,
-            f"r": rate,
-            f"pix_fmt": pix_fmt,
-            **opts,
-        },
+        {**utils.array_to_video_options(data), f"r": rate, **opts},
     )
 
 

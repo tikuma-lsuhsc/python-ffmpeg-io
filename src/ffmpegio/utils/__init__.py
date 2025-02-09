@@ -5,7 +5,7 @@ from numbers import Number
 
 from math import cos, radians, sin
 import re, fractions
-from .. import caps
+from .. import caps, plugins
 from .._utils import *
 from ..stream_spec import *
 
@@ -538,3 +538,14 @@ def pop_global_options(options: dict[str, Any]) -> dict[str, Any]:
 
     all_gopts = caps.options("global")
     return {k: options.pop(k) for k in [k for k in options.keys() if k in all_gopts]}
+
+
+def array_to_video_options(data: Any | None = None) -> dict:
+    """create an input option dict for the given raw video data blob
+
+    :param data: input video frame data, accessed with `video_info` plugin hook, defaults to None (manual config)
+    :return: option dict
+    """
+
+    s, pix_fmt = guess_video_format(*plugins.get_hook().video_info(obj=data))
+    return {"f": "rawvideo", f"c:v": "rawvideo", f"s": s, f"pix_fmt": pix_fmt}
