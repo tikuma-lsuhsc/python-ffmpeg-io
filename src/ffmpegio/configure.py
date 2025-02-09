@@ -119,7 +119,7 @@ def check_url(
                 fileobj = url
                 url = pipe_str
             elif str(url) in ("-", "pipe:", "pipe:0"):
-                try:
+                try:  # for FFConcat
                     data = url.input
                 except:
                     pass

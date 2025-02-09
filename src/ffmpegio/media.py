@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing_extensions import Unpack
 from collections.abc import Sequence
 from .typing import (
     Literal,
@@ -9,6 +8,7 @@ from .typing import (
     ProgressCallable,
     RawDataBlob,
     StreamSpecDict,
+    Unpack,
 )
 
 import contextlib
@@ -129,7 +129,7 @@ def write(
     """write multiple streams to a url/file
 
     :param url: output url
-    :stream_types: list/string of input stream media types, each element is either 'a' (audio) or 'v' (video)
+    :param stream_types: list/string of input stream media types, each element is either 'a' (audio) or 'v' (video)
     :param stream_args: raw input stream data arguments, each input stream is either a tuple of a sample rate (audio) or frame rate (video) followed by a data blob
                          or a tuple of a data blob and a dict of input options. The option dict must include `'ar'` (audio) or `'r'` (video) to specify the rate.
     :param merge_audio_streams: True to combine all input audio streams as a single multi-channel stream. Specify a list of the input stream id's

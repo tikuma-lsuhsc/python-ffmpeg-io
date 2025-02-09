@@ -1,3 +1,5 @@
+""" utility functions for the main modules"""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -5,6 +7,7 @@ from numbers import Number
 
 from math import cos, radians, sin
 import re, fractions
+
 from .. import caps, plugins
 from .._utils import *
 from ..stream_spec import *
