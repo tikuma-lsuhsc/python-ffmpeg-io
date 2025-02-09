@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up FFmpeg
-        uses: FedericoCarboni/setup-ffmpeg@v3
+        uses: FedericoCarboni/setup-ffmpeg@v3.1
         with:
           architecture: x64
           github-token: ${{ secrets.GITHUB_TOKEN }}
