@@ -11,7 +11,7 @@ logger = logging.getLogger("ffmpegio")
 
 from . import utils, plugins, probe
 from .filtergraph.abc import FilterGraphObject
-from ._utils import as_multi_option
+from ._utils import as_multi_option, is_non_str_sequence
 
 UrlType = Literal["input", "output"]
 
@@ -863,9 +863,9 @@ def add_filtergraph(
 
             # remove merged streams from output map & append the output stream of the filter
             map = (
-                [existing_map, *map]
-                if isinstance(existing_map, str) or not isinstance(existing_map, Sequence)
-                else [*existing_map, *map]
+                [*existing_map, *map]
+                if is_non_str_sequence(existing_map)
+                else [existing_map, *map]
             )
 
         outopts['map'] = map
