@@ -10,19 +10,7 @@ from .filtergraph.abc import FilterGraphObject
 
 from .stream_spec import MediaType, StreamSpecDict, StreamSpecDictMediaType
 
+from .configure import FFmpegArgs, FFmpegUrlType
+
 # from typing_extensions import *
 
-
-class FFmpegArgs(TypedDict):
-    """FFmpeg arguments"""
-
-    inputs: list[
-        tuple[FFmpegUrlType | FilterGraphObject, dict | None]
-    ]  # list of input definitions (pairs of url and options)
-    outputs: list[
-        tuple[FFmpegUrlType, dict | None]
-    ]  # list of output definitions (pairs of url and options)
-    global_options: NotRequired[dict | None]  # FFmpeg global options
-
-FFmpegInputUrlComposite = Union[FFmpegUrlType, FilterGraphObject, IO, Buffer]
-FFmpegOutputUrlComposite = Union[FFmpegUrlType, IO]

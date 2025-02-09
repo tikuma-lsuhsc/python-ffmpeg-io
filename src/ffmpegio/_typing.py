@@ -33,20 +33,7 @@ ProgressCallable = Callable[[dict[str, Any], bool], bool]
 """
 
 
-
-
 MediaType = Literal["audio", "video"]
 
 FFmpegUrlType = Union[str, Path, ParseResult]
-FFmpegInputType = Literal["url", "filtergraph", "buffer", "fileobj"]
-FFmpegOutputType = Literal["url", "fileobj"]
 
-
-
-class InputSourceDict(TypedDict):
-    """input source info"""
-
-    src_type: FFmpegInputType  # True if file path/url
-    bytes: NotRequired[bytes]  # index of the source index
-    fileobj: NotRequired[IO]  # file object
-    pipe: NotRequired[NPopen]  # pipe

@@ -1,6 +1,16 @@
 from __future__ import annotations
 
-from .typing import Literal, Any, FFmpegArgs, FFmpegUrlType
+from ._typing import (
+    Literal,
+    Any,
+    MediaType,
+    FFmpegUrlType,
+    Union,
+    NotRequired,
+    TypedDict,
+    IO,
+    Buffer,
+)
 from collections.abc import Sequence
 
 from fractions import Fraction
@@ -16,6 +26,33 @@ from .utils.concat import FFConcat  # for typing
 from ._utils import as_multi_option, is_non_str_sequence
 
 UrlType = Literal["input", "output"]
+FFmpegInputType = Literal["url", "filtergraph", "buffer", "fileobj"]
+FFmpegOutputType = Literal["url", "fileobj"]
+
+FFmpegInputUrlComposite = Union[FFmpegUrlType, FilterGraphObject, IO, Buffer]
+FFmpegOutputUrlComposite = Union[FFmpegUrlType, IO]
+
+
+class FFmpegArgs(TypedDict):
+    """FFmpeg arguments"""
+
+    inputs: list[
+        tuple[FFmpegUrlType | FilterGraphObject | FFConcat, dict | None]
+    ]  # list of input definitions (pairs of url and options)
+    outputs: list[
+        tuple[FFmpegUrlType, dict | None]
+    ]  # list of output definitions (pairs of url and options)
+    global_options: NotRequired[dict | None]  # FFmpeg global options
+
+
+class InputSourceDict(TypedDict):
+    """input source info"""
+
+    src_type: FFmpegInputType  # True if file path/url
+    bytes: NotRequired[bytes]  # index of the source index
+    fileobj: NotRequired[IO]  # file object
+    pipe: NotRequired[NPopen]  # pipe
+
 
 
 def array_to_video_input(
