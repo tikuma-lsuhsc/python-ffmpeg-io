@@ -1,3 +1,9 @@
+"""common-across-subpackages utility functions that are not dependent on ffmpegio types and other functions"""
+
+from __future__ import annotations
+
+from typing import Any, Sequence
+
 try:
     from math import prod
 except:
@@ -44,6 +50,13 @@ def zip(*args, strict=False):
                 raise ValueError(msg)
 
     return strict_zip()
+
+
+def is_non_str_sequence(
+    value: Any, class_excluded: type | tuple[type, ...] = str
+) -> bool:
+    """Returns true if value is a sequence but not a str object"""
+    return isinstance(value, Sequence) and not isinstance(value, class_excluded)
 
 
 def dtype_itemsize(dtype):
