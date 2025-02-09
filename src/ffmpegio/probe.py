@@ -11,7 +11,6 @@ from fractions import Fraction
 from functools import lru_cache
 
 from .path import ffprobe, PIPE
-from .utils import parse_stream_spec
 
 # fmt:off
 __all__ = ['full_details', 'format_basic', 'streams_basic',
@@ -447,25 +446,17 @@ def video_streams_basic(
     """Retrieve basic info of video streams
 
     :param url: URL of the media file/stream
-    :type url: str or seekable file-like object or bytes-like object
     :param index: video stream index. 0=first video stream. Defaults to None, which returns info of all video streams
-    :type index: int, optional
     :param entries: specify to narrow which information entries to retrieve. Default to None, to return all entries
-    :type entries: seq of str
     :param keep_optional_fields: True to return a missing optional field in the
                         returned dict with None or "N/A" (if keep_str_values
                         is True) as its value
-    :type keep_optional_fields: bool, optional
     :param keep_str_values: True to keep all field values as str,
                             defaults to False to convert numeric values
-    :type keep_str_values: bool, optional
     :param cache_output: True to cache FFprobe output, defaults to False
-    :type cache_output: bool, optional
     :param sp_kwargs: Additional keyword arguments for :py:func:`subprocess.run`,
                       default to None
-    :type sp_kwargs: dict[str, Any], optional
     :return: List of video stream information.
-    :rtype: list of dict
 
 
     Video Stream Information Entries
@@ -564,25 +555,17 @@ def audio_streams_basic(
     """Retrieve basic info of audio streams
 
     :param url: URL of the media file/stream
-    :type url: str or seekable file-like object or bytes-like object
     :param index: audio stream index. 0=first audio stream. Defaults to None, which returns info of all audio streams
-    :type index: int, optional
     :param entries: specify to narrow which information entries to retrieve. Default to None, to return all entries
-    :type entries: seq of str
     :param keep_optional_fields: True to return a missing optional field in the
                         returned dict with None or "N/A" (if keep_str_values
                         is True) as its value
-    :type keep_optional_fields: bool, optional
     :param keep_str_values: True to keep all field values as str,
                             defaults to False to convert numeric values
-    :type keep_str_values: bool, optional
     :param cache_output: True to cache FFprobe output, defaults to False
-    :type cache_output: bool, optional
     :param sp_kwargs: Additional keyword arguments for :py:func:`subprocess.run`,
                       default to None
-    :type sp_kwargs: dict[str, Any], optional
     :return: List of audio stream information.
-    :rtype: list of dict
 
     Audio Stream Information Entries
 
