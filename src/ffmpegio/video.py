@@ -6,25 +6,10 @@ from .utils import log as log_utils
 __all__ = ["create", "read", "write", "filter", "detect"]
 
 
-def _run_read(
-    *args,
-    shape=None,
-    pix_fmt_in=None,
-    r_in=None,
-    s_in=None,
-    show_log=None,
-    sp_kwargs=None,
-    **kwargs,
-):
+def _run_read(*args, show_log=None, sp_kwargs=None, **kwargs):
     """run FFmpeg and retrieve audio stream data
     :param *args ffmpegprocess.run arguments
     :type *args: tuple
-    :param shape: output frame size if known, defaults to None
-    :type shape: (int, int), optional
-    :param pix_fmt_in: input pixel format if known but not specified in the ffmpeg arg dict, defaults to None
-    :type pix_fmt_in: str, optional
-    :param s_in: input frame size (wxh) if known but not specified in the ffmpeg arg dict, defaults to None
-    :type s_in: str or (int, int), optional
     :param show_log: True to show FFmpeg log messages on the console,
                      defaults to None (no show/capture)
                      Ignored if stream format must be retrieved automatically.
@@ -40,9 +25,7 @@ def _run_read(
     :rtype: object
     """
 
-    dtype, shape, r = configure.finalize_video_read_opts(
-        args[0], pix_fmt_in, s_in, r_in
-    )
+    dtype, shape, r = configure.finalize_video_read_opts(args[0], istream="v:0")
 
     if sp_kwargs is not None:
         kwargs = {**sp_kwargs, **kwargs}
@@ -124,14 +107,13 @@ def create(expr, *args, progress=None, show_log=None, sp_kwargs=None, **options)
 
     ffmpeg_args = configure.empty()
     configure.add_url(ffmpeg_args, "input", url, {**input_options, "f": "lavfi"})
-    configure.add_url(ffmpeg_args, "output", "-", {**options, "f": "rawvideo"})
+    configure.add_url(
+        ffmpeg_args, "output", "-", {"pix_fmt": "rgb24", **options, "f": "rawvideo"}
+    )
+    # TODO: filtergraph scanning will remove the default 'pix_fmt' setting
 
     return _run_read(
-        ffmpeg_args,
-        pix_fmt_in=input_options.get("pix_fmt", "rgb24"),
-        progress=progress,
-        show_log=show_log,
-        sp_kwargs=sp_kwargs,
+        ffmpeg_args, progress=progress, show_log=show_log, sp_kwargs=sp_kwargs
     )
 
 
@@ -157,17 +139,7 @@ def read(url, progress=None, show_log=None, sp_kwargs=None, **options):
     :rtype: (fractions.Fraction, object)
     """
 
-    pix_fmt = options.get("pix_fmt", None)
-
     # get pix_fmt of the input file only if needed
-    pix_fmt_in = s_in = r_in = None
-    if pix_fmt is None and "pix_fmt_in" not in options:
-        try:
-            pix_fmt_in, *s_in, ra_in, rr_in = _probe_video_info(url, "v:0", sp_kwargs)
-            r_in = rr_in if ra_in is None or ra_in == "0/0" else ra_in
-        except:
-            pix_fmt_in = "rgb24"
-
     input_options = utils.pop_extra_options(options, "_in")
 
     # get url/file stream
@@ -185,13 +157,7 @@ def read(url, progress=None, show_log=None, sp_kwargs=None, **options):
     sp_kwargs["input"] = input
 
     return _run_read(
-        ffmpeg_args,
-        progress=progress,
-        show_log=show_log,
-        pix_fmt_in=pix_fmt_in,
-        s_in=s_in,
-        r_in=r_in,
-        sp_kwargs=sp_kwargs,
+        ffmpeg_args, progress=progress, show_log=show_log, sp_kwargs=sp_kwargs
     )
 
 
@@ -324,10 +290,7 @@ def filter(expr, rate, input, progress=None, show_log=None, sp_kwargs=None, **op
     sp_kwargs["input"] = plugins.get_hook().video_bytes(obj=input)
 
     return _run_read(
-        ffmpeg_args,
-        progress=progress,
-        show_log=show_log,
-        sp_kwargs=sp_kwargs,
+        ffmpeg_args, progress=progress, show_log=show_log, sp_kwargs=sp_kwargs
     )
 
 

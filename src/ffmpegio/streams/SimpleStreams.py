@@ -4,7 +4,6 @@ import logging
 logger = logging.getLogger("ffmpegio")
 
 from .. import utils, configure, ffmpegprocess, plugins
-from ..probe import _audio_info as _probe_audio_info, _video_info as _probe_video_info
 from ..threading import LoggerThread, ReaderThread, WriterThread
 
 # fmt:off
@@ -223,31 +222,17 @@ class SimpleVideoReader(SimpleReaderBase):
         outopts = ffmpeg_args.get("outputs", [])[0][1]
         has_fg = configure.has_filtergraph(ffmpeg_args, "video")
 
-        pix_fmt = outopts.get("pix_fmt", None)
-        pix_fmt_in = s_in = r_in = None
-        if (
-            pix_fmt is None
-            and not has_fg
-            and inurl not in ("-", "pipe:", "pipe:0")
-            and not inopts.get("pix_fmt", None)
-        ):
-            try:
-                # must assign output rgb/grayscale pixel format
-                pix_fmt_in, *s_in, ra_in, rr_in = _probe_video_info(
-                    inurl, "v:0", self.sp_kwargs
-                )
-                r_in = rr_in if ra_in is None or ra_in == "0/0" else ra_in
-            except:
-                pix_fmt_in = "rgb24"
-
-        if pix_fmt_in is None and pix_fmt is None:
-            raise ValueError("pix_fmt must be specified.")
-
         (
             self.dtype,
             self.shape,
             self.rate,
-        ) = configure.finalize_video_read_opts(ffmpeg_args, pix_fmt_in, s_in, r_in)
+        ) = configure.finalize_video_read_opts(ffmpeg_args, istream="v:0")
+
+        pix_fmt = outopts.get("pix_fmt", None)
+        pix_fmt_in = inopts.get("pix_fmt", None)
+
+        if pix_fmt_in is None and pix_fmt is None:
+            raise ValueError("pix_fmt must be specified.")
 
         # construct basic video filter if options specified
         configure.build_basic_vf(
@@ -291,26 +276,11 @@ class SimpleAudioReader(SimpleReaderBase):
     def _finalize(self, ffmpeg_args):
         # finalize FFmpeg arguments and output array
 
-        inurl, inopts = ffmpeg_args.get("inputs", [])[0]
-        has_fg = configure.has_filtergraph(ffmpeg_args, "audio")
-
-        sample_fmt_in = inopts.get("sample_fmt", None)
-        ac_in = ar_in = None
-        if not has_fg and sample_fmt_in is None:
-            # use the same format as the input
-            try:
-                # use the same format as the input
-                ar_in, sample_fmt_in, ac_in = _probe_audio_info(
-                    inurl, "a:0", self.sp_kwargs
-                )
-            except:
-                sample_fmt_in = "s16"
-
         (
             self.dtype,
             ac,
             self.rate,
-        ) = configure.finalize_audio_read_opts(ffmpeg_args, sample_fmt_in, ac_in, ar_in)
+        ) = configure.finalize_audio_read_opts(ffmpeg_args, istream="a:0")
 
         if ac is not None:
             self.shape = (ac,)

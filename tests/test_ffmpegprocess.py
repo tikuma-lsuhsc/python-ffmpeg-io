@@ -91,14 +91,6 @@ def test_popen():
 
 def test_popen_progress():
     url = "tests/assets/testvideo-1m.mp4"
-    info = probe.video_streams_basic(
-        url, 0, ["pix_fmt", "width", "height", "frame_rate"]
-    )
-    pix_fmt_in = info["pix_fmt"]
-    s_in = (info["width"], info["height"])
-    r_in = info["frame_rate"]
-
-    i = 0
 
     def progress(*args):
         global i
@@ -110,9 +102,7 @@ def test_popen_progress():
     configure.add_url(ffmpeg_args, "input", url)
     configure.add_url(ffmpeg_args, "output", "-")
 
-    dtype, shape, r = configure.finalize_video_read_opts(
-        ffmpeg_args, pix_fmt_in, s_in, r_in
-    )
+    dtype, shape, r = configure.finalize_video_read_opts(ffmpeg_args, istream="v:0")
 
     samplesize = utils.get_samplesize(shape, dtype)
 

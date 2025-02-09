@@ -11,9 +11,6 @@ __all__ = ["create", "read", "write", "filter", "detect"]
 
 def _run_read(
     *args,
-    sample_fmt_in=None,
-    ac_in=None,
-    ar_in=None,
     show_log=None,
     sp_kwargs=None,
     **kwargs,
@@ -49,9 +46,7 @@ def _run_read(
     :rtype: (int, str)
     """
 
-    dtype, ac, rate = configure.finalize_audio_read_opts(
-        args[0], sample_fmt_in, ac_in, ar_in
-    )
+    dtype, ac, rate = configure.finalize_audio_read_opts(args[0], istream="a:0")
 
     if sp_kwargs is not None:
         kwargs = {**sp_kwargs, **kwargs}
@@ -144,14 +139,15 @@ def create(expr, *args, progress=None, show_log=None, sp_kwargs=None, **options)
         )
 
     ffmpeg_args = configure.empty()
-    inopts = configure.add_url(
+    configure.add_url(
         ffmpeg_args, "input", url, {**input_options, "f": "lavfi"}
     )[1][1]
-    configure.add_url(ffmpeg_args, "output", "-", options)[1][1]
+    configure.add_url(ffmpeg_args, "output", "-", {"sample_fmt": "dbl", **options})[1][
+        1
+    ]
 
     return _run_read(
         ffmpeg_args,
-        sample_fmt_in=inopts.get("sample_fmt", "dbl"),
         progress=progress,
         show_log=show_log,
         sp_kwargs=sp_kwargs,
@@ -187,15 +183,6 @@ def read(url, progress=None, show_log=None, sp_kwargs=None, **options):
 
     """
 
-    sample_fmt = options.get("sample_fmt", None)
-    ac_in = ar_in = None
-    if sample_fmt is None:
-        try:
-            # use the same format as the input
-            ar_in, sample_fmt, ac_in = _probe_audio_info(url, "a:0", sp_kwargs)
-        except:
-            sample_fmt = "s16"
-
     input_options = utils.pop_extra_options(options, "_in")
     url, stdin, input = configure.check_url(
         url, False, format=input_options.get("f", None)
@@ -212,9 +199,6 @@ def read(url, progress=None, show_log=None, sp_kwargs=None, **options):
 
     return _run_read(
         ffmpeg_args,
-        sample_fmt_in=sample_fmt,
-        ac_in=ac_in,
-        ar_in=ar_in,
         progress=progress,
         show_log=show_log,
         sp_kwargs=sp_kwargs,

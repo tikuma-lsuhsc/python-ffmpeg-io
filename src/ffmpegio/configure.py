@@ -9,8 +9,7 @@ import re, logging
 
 logger = logging.getLogger("ffmpegio")
 
-from . import utils, plugins
-from .filtergraph import Graph, Filter, Chain
+from . import utils, plugins, probe
 from .filtergraph.abc import FilterGraphObject
 from .errors import FFmpegioError
 
@@ -229,10 +228,39 @@ def has_filtergraph(args, type):
 
 
 def finalize_video_read_opts(
-    args, pix_fmt_in=None, s_in=None, r_in=None, ofile=0, ifile=0
-):
-    inopts = args["inputs"][ifile][1] or {}
+    args: FFmpegArgs, ofile: int = 0, ifile: int = 0, istream: str | None = None
+) -> tuple[str, tuple[int, int], Fraction]:
+
+    inurl, inopts = args["inputs"][ifile]
+    if inopts is None:
+        inopts = {}
     outopts = args["outputs"][ofile][1]
+
+    pix_fmt_in = inopts.get("pix_fmt", None)
+    w_in, h_in = inopts.get("s", (None, None))
+    r_in = inopts.get("r", None)
+
+    if (
+        isinstance(inurl, (str, Path))
+        and inopts.get("f", None) != "lavfi"
+        and not (pix_fmt_in and w_in and h_in and r_in)
+    ):
+        # TODO: handle lavfi filter processing
+        try:
+            # ["pix_fmt", "width", "height", "avg_frame_rate", "r_frame_rate"]
+            v_pix_fmt, v_width, v_height, vr1, vr2 = probe._video_info(
+                inurl, istream, None
+            )
+            pix_fmt_in, w_in, h_in, r_in = (
+                x or y
+                for x, y in zip(
+                    (pix_fmt_in, w_in, h_in, r_in),
+                    (v_pix_fmt, v_width, v_height, vr1 or vr2),
+                )
+            )
+        except:
+            pass  # not probable, OK... maybe
+    s_in = (w_in, h_in) if w_in and h_in else None
 
     if outopts is None:
         outopts = {}
@@ -243,7 +271,6 @@ def finalize_video_read_opts(
     remove_alpha = False
     if pix_fmt is None:
         # deduce output pixel format from the input pixel format
-        pix_fmt_in = inopts.get("pix_fmt", pix_fmt_in)
         try:
             outopts["pix_fmt"], ncomp, dtype, _ = utils.get_pixel_config(pix_fmt_in)
         except:
@@ -267,9 +294,8 @@ def finalize_video_read_opts(
     # if no filter and video shape and rate are known, all known
     r = s = None
     if not has_filtergraph(args, "video") and ncomp is not None:
-        r = outopts.get("r", inopts.get("r", r_in))
-
-        s = outopts.get("s", inopts.get("s", s_in))
+        r = outopts.get("r", r_in)
+        s = outopts.get("s", s_in)
         if s is not None:
             if isinstance(s, str):
                 m = re.match(r"(\d+)x(\d+)", s)
@@ -423,11 +449,30 @@ def build_basic_vf(args, remove_alpha=None, ofile=0):
 
 
 def finalize_audio_read_opts(
-    args, sample_fmt_in=None, ac_in=None, ar_in=None, ofile=0, ifile=0
-):
-    inopts = args["inputs"][ifile][1] or {}
+    args: FFmpegArgs, ofile: int = 0, ifile: int = 0, istream: str | None = None
+) -> tuple[str, int, int]:
+
+    inurl, inopts = args["inputs"][ifile]
+    if inopts is None:
+        inopts = {}
     outopts = args["outputs"][ofile][1]
     has_filter = has_filtergraph(args, "audio")
+
+    sample_fmt_in = inopts.get("sample_fmt", None)
+    ac_in = inopts.get("ac", None)
+    ar_in = inopts.get("ar", None)
+    if isinstance(inurl, (str, Path)) and not (sample_fmt_in and ac_in and ar_in):
+        # TODO: handle lavfi input
+        try:
+            ar_in, sample_fmt_in, ac_in = (
+                x or y
+                for x, y in zip(
+                    (ar_in, sample_fmt_in, ac_in),
+                    probe._audio_info(inurl, istream, None),
+                )
+            )
+        except:
+            pass
 
     if outopts is None:
         outopts = {}
@@ -437,7 +482,7 @@ def finalize_audio_read_opts(
     sample_fmt = outopts.get("sample_fmt", None)
     if sample_fmt is None:
         # get pixel format from input
-        sample_fmt = inopts.get("sample_fmt", sample_fmt_in)
+        sample_fmt = sample_fmt_in
         if sample_fmt:
             if sample_fmt[-1] == "p":
                 # planar format is not supported
@@ -449,8 +494,8 @@ def finalize_audio_read_opts(
 
     ac = ar = None
     if not has_filter:
-        ac = outopts.get("ac", inopts.get("ac", ac_in))
-        ar = outopts.get("ar", inopts.get("ar", ar_in))
+        ac = outopts.get("ac", ac_in)
+        ar = outopts.get("ar", ar_in)
 
     # sample_fmt must be given
     dtype, shape = utils.get_audio_format(sample_fmt, ac)
