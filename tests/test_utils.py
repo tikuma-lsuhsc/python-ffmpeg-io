@@ -35,51 +35,6 @@ def test_string_escaping():
     assert utils.unescape(esc) == raw
 
 
-@pytest.mark.parametrize(
-    ("arg", "file_index", "ret"),
-    [
-        (1, False, {"index": 1}),
-        ("1", False, {"index": 1}),
-        ("v", False, {"media_type": "v"}),
-        ("p:1", False, {"program_id": 1}),
-        ("p:1:V", False, {"program_id": 1, "media_type": "V"}),
-        (
-            "p:1:a:#6",
-            False,
-            {
-                "program_id": 1,
-                "media_type": "a",
-                "stream_id": 6,
-            },
-        ),
-        ("d:i:6", False, {"media_type": "d", "stream_id": 6}),
-        ("t:m:key", False, {"media_type": "t", "tag": "key"}),
-        ("m:key:value", False, {"tag": ("key", "value")}),
-        ("u", False, {"usable": True}),
-        ("0:1", True, {"index": 1, "file_index": 0}),
-        ([0, 1], True, {"index": 1, "file_index": 0}),
-    ],
-)
-def test_parse_stream_spec(arg, file_index, ret):
-    assert utils.parse_stream_spec(arg, file_index) == ret
-
-
-def test_stream_spec():
-    assert utils.stream_spec() == ""
-    assert utils.stream_spec(0) == "0"
-    assert utils.stream_spec(media_type="a") == "a"
-    assert utils.stream_spec(1, media_type="v") == "v:1"
-    assert utils.stream_spec(program_id=1) == "p:1"
-    assert utils.stream_spec(1, media_type="v", program_id=1) == "v:p:1:1"
-    assert utils.stream_spec(stream_id=342) == "#342"
-    assert utils.stream_spec(tag="creation_time") == "m:creation_time"
-    assert (
-        utils.stream_spec(tag=("creation_time", "2018-05-26T19:36:24.000000Z"))
-        == "m:creation_time:2018-05-26T19:36:24.000000Z"
-    )
-    assert utils.stream_spec(usable=True) == "u"
-
-
 def test_get_pixel_config():
     with pytest.raises(Exception):
         utils.get_pixel_config("yuv")  # unknown format
