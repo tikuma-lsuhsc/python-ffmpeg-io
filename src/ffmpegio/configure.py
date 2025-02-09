@@ -10,6 +10,7 @@ import re, logging
 logger = logging.getLogger("ffmpegio")
 
 from . import utils, plugins, probe
+from . import filtergraph as fgb
 from .filtergraph.abc import FilterGraphObject
 from .utils.concat import FFConcat  # for typing
 from ._utils import as_multi_option, is_non_str_sequence
@@ -306,9 +307,11 @@ def _build_video_basic_filter(
     bg_color = fill_color or "white"
 
     vfilters = (
-        Graph(f"color=c={bg_color}[l1];[l1][in]scale2ref[l2],[l2]overlay=shortest=1")
+        fgb.Graph(
+            f"color=c={bg_color}[l1];[l1][in]scale2ref[l2],[l2]overlay=shortest=1"
+        )
         if remove_alpha
-        else Chain()
+        else fgb.Chain()
     )
 
     if square_pixels == "upscale":
@@ -325,9 +328,9 @@ def _build_video_basic_filter(
     if crop:
         try:
             assert not isinstance(crop, str)
-            vfilters += Filter("crop", *crop)
+            vfilters += fgb.Filter("crop", *crop)
         except:
-            vfilters += Filter("crop", crop)
+            vfilters += fgb.Filter("crop", crop)
 
     if flip:
         try:
@@ -342,9 +345,9 @@ def _build_video_basic_filter(
     if transpose is not None:
         try:
             assert not isinstance(transpose, str)
-            vfilters += Filter("transpose", *transpose)
+            vfilters += fgb.Filter("transpose", *transpose)
         except:
-            vfilters += Filter("transpose", transpose)
+            vfilters += fgb.Filter("transpose", transpose)
 
     if scale:
         try:
@@ -353,9 +356,9 @@ def _build_video_basic_filter(
             pass
         try:
             assert not isinstance(scale, str)
-            vfilters += Filter("scale", *scale)
+            vfilters += fgb.Filter("scale", *scale)
         except:
-            vfilters += Filter("scale", scale)
+            vfilters += fgb.Filter("scale", scale)
 
     return vfilters
 
@@ -687,7 +690,7 @@ def config_input_fg(expr, args, kwargs):
              known and finite, and unprocessed kwarg items.
     :rtype: (str|Filter,float|None,dict)
     """
-    fg = Graph(expr)
+    fg = fgb.Graph(expr)
     dopt = None  # duration option
 
     if len(fg) != 1 or len(fg[0]) != 1:
@@ -781,7 +784,7 @@ def add_urls(
 
 def add_filtergraph(
     args: FFmpegArgs,
-    filtergraph: Graph,
+    filtergraph: fgb.Graph,
     map: Sequence[str] | None = None,
     automap: bool = True,
     append_filter: bool = True,
