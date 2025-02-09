@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .utils.typing import Literal, Any, FFmpegArgs, StreamSpecDict
+from .typing import Literal, Any, FFmpegArgs, StreamSpecDict
 from collections.abc import Sequence
 
 from fractions import Fraction

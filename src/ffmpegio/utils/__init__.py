@@ -9,7 +9,7 @@ from .. import caps
 from .._utils import *
 from ..stream_spec import *
 
-from .typing import Any
+from ..typing import Any
 
 # TODO: auto-detect endianness
 # import sys

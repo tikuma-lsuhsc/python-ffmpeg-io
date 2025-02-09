@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing_extensions import Unpack
 from collections.abc import Sequence
-from .utils.typing import (
+from .typing import (
     Literal,
     Any,
     RawStreamDef,
