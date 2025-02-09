@@ -540,6 +540,19 @@ def pop_global_options(options: dict[str, Any]) -> dict[str, Any]:
     return {k: options.pop(k) for k in [k for k in options.keys() if k in all_gopts]}
 
 
+def array_to_audio_options(data: Any) -> dict:
+    """create an input option dict for the given raw audio data blob
+    :param data: input audio data, accessed by `audio_info` plugin hook, defaults to None (manual config)
+    :returns: dict of audio options
+    """
+
+    shape = dtype = None
+    shape, dtype = plugins.get_hook().audio_info(obj=data)
+    sample_fmt, ac = guess_audio_format(dtype, shape)
+    codec, f = get_audio_codec(sample_fmt)
+    return {"f": f, f"c:a": codec, f"ac": ac, f"sample_fmt": sample_fmt}
+
+
 def array_to_video_options(data: Any | None = None) -> dict:
     """create an input option dict for the given raw video data blob
 

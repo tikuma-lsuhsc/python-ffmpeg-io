@@ -58,21 +58,9 @@ def array_to_audio_input(
     if rate is None and "ar" not in opts:
         raise ValueError("rate argument must be specified if opts['ar'] is not given.")
 
-    shape = dtype = None
-    shape, dtype = plugins.get_hook().audio_info(obj=data)
-    sample_fmt, ac = utils.guess_audio_format(dtype, shape)
-    codec, f = utils.get_audio_codec(sample_fmt)
-
     return (
         pipe_id or "-",
-        {
-            "f": f,
-            f"c:a": codec,
-            f"ac": ac,
-            f"ar": rate,
-            f"sample_fmt": sample_fmt,
-            **opts,
-        },
+        {**utils.array_to_audio_options(data), f"ar": rate, **opts},
     )
 
 
