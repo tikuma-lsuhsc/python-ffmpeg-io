@@ -800,6 +800,13 @@ class SimpleFilterBase:
         if self._proc is None:
             return
 
+        try:
+            # write the sentinel to the writer thread to terminate immediately
+            self._writer.join()
+        except:
+            # possibly close before opening the writer thread
+            pass
+
         self._proc.stdout.close()
         self._proc.stderr.close()
 
@@ -820,11 +827,6 @@ class SimpleFilterBase:
             self._reader.join()
         except:
             # possibly close before opening the reader thread
-            pass
-        try:
-            self._writer.join()
-        except:
-            # possibly close before opening the writer thread
             pass
 
     @property
@@ -943,7 +945,12 @@ class SimpleFilterBase:
         y = self._reader.read_all(timeout)
         self._proc.stdin.close()
         self._proc.wait()
-        y += self._reader.read_all(None)
+        self._reader.cool_down()
+        nbytes = len(y)
+        while nbytes:
+            y1 = self._reader.read_all(None)
+            nbytes = len(y1)
+            y += y1
         self.nout += len(y) // self._bps_out
         return self._converter(b=y, dtype=self.dtype, shape=self.shape, squeeze=False)
 
