@@ -392,27 +392,23 @@ def streams_basic(
     keep_str_values: bool | None = False,
     cache_output: bool | None = False,
     sp_kwargs: dict[str, Any] | None = None,
+    stream_spec: str | None = None,
 ) -> list[dict[str, str | Number | Fraction]]:
     """Retrieve basic info of media streams
 
     :param url: URL of the media file/stream
-    :type url: str or seekable file-like object or bytes-like object
     :param entries: specify to narrow which stream entries to retrieve. Default to None, returning all entries
-    :type entries: seq of str, optional
     :param keep_optional_fields: True to return a missing optional field in the
                         returned dict with None or "N/A" (if keep_str_values
                         is True) as its value
-    :type keep_optional_fields: bool, optional
     :param keep_str_values: True to keep all field values as str,
                             defaults to False to convert numeric values
-    :type keep_str_values: bool, optional
     :param cache_output: True to cache FFprobe output, defaults to False
-    :type cache_output: bool, optional
     :param sp_kwargs: Additional keyword arguments for :py:func:`subprocess.run`,
                       default to None
-    :type sp_kwargs: dict[str, Any], optional
+    :param stream_spec: Specify stream specification, defaults to None
+    :type stream_spec: str | None, optional
     :return: List of media stream information.
-    :rtype: list of dict
 
     Media Stream Information dict Entries
 
@@ -430,7 +426,7 @@ def streams_basic(
 
     return query(
         url,
-        True,
+        stream_spec or True,
         _resolve_entries("basic streams", entries, default_entries),
         keep_optional_fields,
         keep_str_values,
