@@ -59,6 +59,24 @@ def is_non_str_sequence(
     return isinstance(value, Sequence) and not isinstance(value, class_excluded)
 
 
+def as_multi_option(value: Any, exclude_classes: tuple[type] = None) -> Sequence[Any]:
+    """Put value in a list if it is not already a sequence
+
+    :param value: value to be put in a list
+    :param exclude_classes: sequence classes to be treated as an option value, defaults to None
+    :return: option values in a sequence
+    """
+
+    if exclude_classes is None:
+        exclude_classes = str
+
+    return (
+        value
+        if isinstance(value, Sequence) and not isinstance(value, exclude_classes)
+        else [value]
+    )
+
+
 def dtype_itemsize(dtype):
     return int(dtype[-1])
 

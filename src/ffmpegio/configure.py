@@ -11,7 +11,7 @@ logger = logging.getLogger("ffmpegio")
 
 from . import utils, plugins, probe
 from .filtergraph.abc import FilterGraphObject
-from .errors import FFmpegioError
+from ._utils import as_multi_option
 
 UrlType = Literal["input", "output"]
 
@@ -837,11 +837,8 @@ def add_filtergraph(
         if complex_filters is None:
             complex_filters = filtergraph
         else:
-            complex_filters = (
-                [complex_filters]
-                if isinstance(complex_filters, Sequence)
-                and not isinstance(complex_filters, Sequence)
-                else [*complex_filters]
+            complex_filters = as_multi_option(
+                complex_filters, (str, fgb.Graph, fgb.Chain)
             )
             complex_filters.append(filtergraph)
     else:
