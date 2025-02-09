@@ -257,4 +257,5 @@ def filter(expr, input, show_log=None, sp_kwargs=None, **options):
         ffmpeg_args,
         input=plugins.get_hook().video_bytes(obj=input),
         show_log=show_log,
+        sp_kwargs=sp_kwargs,
     )

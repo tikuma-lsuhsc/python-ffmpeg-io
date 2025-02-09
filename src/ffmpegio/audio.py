@@ -327,6 +327,7 @@ def filter(
         input=plugins.get_hook().audio_bytes(obj=input),
         progress=progress,
         show_log=show_log,
+        sp_kwargs=sp_kwargs,
     )
 
 
