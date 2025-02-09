@@ -55,7 +55,9 @@ class SimpleReaderBase:
         self._logger = LoggerThread(None, show_log)
 
         kwargs = {**sp_kwargs} if sp_kwargs else {}
-        kwargs.update({"stdin": stdin, "progress": progress, "capture_log": True})
+        kwargs.update(
+            {"stdin": stdin, "progress": progress, "capture_log": True, "bufsize": 0}
+        )
 
         # start FFmpeg
         self._proc = ffmpegprocess.Popen(ffmpeg_args, **kwargs)
@@ -348,6 +350,7 @@ class SimpleWriterBase:
                 "capture_log": True,
                 "overwrite": overwrite,
                 "stdout": stdout,
+                "bufsize": 0,
             }
         )
 
@@ -717,6 +720,7 @@ class SimpleFilterBase:
                 "ffmpeg_args": ffmpeg_args,
                 "progress": progress,
                 "capture_log": True,
+                "bufsize": 0,
             }
         )
 
