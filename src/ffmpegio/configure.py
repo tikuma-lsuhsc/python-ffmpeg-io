@@ -642,7 +642,7 @@ def clear_loglevel(args):
         pass
 
 
-def finalize_media_read_opts(args):
+def finalize_avi_read_opts(args):
     """finalize multiple-input media reader setup
 
     :param args: FFmpeg dict

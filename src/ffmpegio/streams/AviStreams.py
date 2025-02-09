@@ -85,7 +85,7 @@ class AviMediaReader:
             configure.add_url(args, "input", url, opts)
 
         # configure output options
-        use_ya = configure.finalize_media_read_opts(args)
+        use_ya = configure.finalize_avi_read_opts(args)
 
         self._reader = threading.AviReaderThread(queuesize)
 
