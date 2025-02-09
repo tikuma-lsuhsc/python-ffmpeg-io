@@ -9,6 +9,8 @@ from __future__ import annotations
 from typing import get_args, Literal, TypedDict, Union, Tuple
 from ._typing import MediaType, NotRequired
 
+import re
+
 StreamSpecDictMediaType = Literal["v", "a", "s", "d", "t", "V"]
 # libavformat/avformat.c:match_stream_specifier()
 
@@ -35,10 +37,32 @@ class StreamSpecDict_Usable(StreamSpecDict_Options):
 
 StreamSpecDict = Union[StreamSpecDict_Index, StreamSpecDict_Tag, StreamSpecDict_Usable]
 
+
+class InputMapOptionDict(TypedDict):
+    """Parsed dict of FFmpeg -map option when mapping input stream(s)"""
+
+    negative: NotRequired[
+        bool
+    ]  # True to disables matching streams from already created mappings
+    input_file_id: int  # index of the source index
+    stream_specifier: NotRequired[str | StreamSpecDict]  # stream specifier
+    view_specifier: NotRequired[str]  # view specifier
+    optional: NotRequired[str]  # True if optional mapping
+
+
+class GraphMapOptionDict(TypedDict):
+    """Parsed dict of FFmpeg -map option, when mapping filtergraph output(s)"""
+
+    linklabel: str | None  # link label of output of a filtergraph
+
+
+MapOptionDict = Union[InputMapOptionDict, GraphMapOptionDict]
+"""Parsed dict of FFmpeg -map option string"""
+
 #################################
 
 
-def parse_stream_spec(spec: str | int) -> StreamSpec:
+def parse_stream_spec(spec: str | int) -> StreamSpecDict:
     """Parse stream specifier string
 
     :param spec: stream specifier string. If int, it specifies the stream index.
@@ -49,7 +73,7 @@ def parse_stream_spec(spec: str | int) -> StreamSpec:
 
     if isinstance(spec, str):
 
-        out: StreamSpec = {}
+        out: StreamSpecDict = {}
         spec_parts = spec.split(":")
         nspecs = len(spec_parts)
         i = 0  # current index
@@ -82,7 +106,7 @@ def parse_stream_spec(spec: str | int) -> StreamSpec:
         while i < nspecs:
             spec = spec_parts[i]
             # optional specifiers first
-            if spec in get_args(StreamSpecMediaType):
+            if spec in get_args(StreamSpecDictMediaType):
                 out["media_type"] = spec
                 i += 1
             elif spec == "g":
@@ -215,7 +239,7 @@ def stream_spec(
     spec = [] if file_index is None else [str(file_index)]
 
     if media_type is not None:
-        if media_type not in get_args(StreamSpecMediaType):
+        if media_type not in get_args(StreamSpecDictMediaType):
             raise ValueError(f"Unknown {media_type=}.")
         spec.append(media_type)
 
@@ -237,3 +261,77 @@ def stream_spec(
         spec.append("u")
 
     return spec if no_join else ":".join(spec)
+
+
+#################################
+
+
+def parse_map_option(map: str, *, input_file_id: int | None = None) -> MapOptionDict:
+    """parse the FFmpeg -map option str
+
+    :param map: option string value
+    :param input_file_id: if specified, auto-insert this id if a file id is missing in the given value,
+                          defaults to None to error out if missing.
+    :param parse_stream_spec: True to also parse stream spec (if given)
+    :return: dict containing the parsed parts of the option value, possibly containing the items:
+        - negative: bool
+        - input_file_id: int
+        - stream_specifier: str|StreamSpecDictDict
+        - view_specifier: str
+        - optional: bool
+        - linklabel: str
+
+    See the FFmpeg manual for the specification: https://ffmpeg.org/ffmpeg.html#Advanced-options
+    """
+
+    map = str(map)
+
+    # -map [-]input_file_id[:stream_specifier][:view_specifier][:?] | [linklabel]
+    if map[0] == "[" and map[-1] == "]":
+        return {"linklabel": map}
+
+    if input_file_id is not None:
+        s1 = map.split(":", 1)
+        if len(s1) == 1 or not s1[0].isdigit():
+            map = f"{input_file_id}:{map}"
+
+    m = re.match(r"(-)?(\d+)(\:[^?]+?)?(\?)?$", map)
+
+    if not m:
+        raise ValueError(f"Given str ({map}) is not a valid FFmpeg map option.")
+
+    out = {"input_file_id": int(m[2])}
+    if m[1]:
+        out["negative"] = True
+    if m[3]:
+        s = re.search(r"\:(?:view|vidx|vpos)\:(?:[^:]+)$", m[3])
+        if not s:
+            out["stream_specifier"] = m[3][1:]
+        elif s.start(0):
+            out["stream_specifier"] = m[3][1 : s.start(0)]
+            out["view_specifier"] = m[3][s.start(0) + 1 :]
+        else:
+            out["view_specifier"] = m[3][1:]
+    if m[4]:
+        out["optional"] = True
+
+    return out
+
+
+def is_map_spec(spec: str, allow_missing_file_id: bool = False) -> bool:
+    """True if valid stream specifier string
+
+    :param spec: map specifier string to be tested
+    :param allow_missing_file_id: True to allow missing input file id
+    :return: True if valid stream specifier
+    """
+
+    try:
+        mspec = parse_map_option(
+            spec, input_file_id=0 if allow_missing_file_id else None
+        )
+        if "stream_specifier" in mspec:
+            parse_stream_spec(mspec["stream_specifier"])
+    except Exception:
+        return False
+    return True
