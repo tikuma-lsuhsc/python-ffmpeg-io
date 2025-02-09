@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .typing import Literal, Any, FFmpegArgs, StreamSpecDict
+from .typing import Literal, Any, FFmpegArgs, FFmpegUrlType
 from collections.abc import Sequence
 
 from fractions import Fraction
@@ -11,6 +11,7 @@ logger = logging.getLogger("ffmpegio")
 
 from . import utils, plugins, probe
 from .filtergraph.abc import FilterGraphObject
+from .utils.concat import FFConcat  # for typing
 from ._utils import as_multi_option, is_non_str_sequence
 
 UrlType = Literal["input", "output"]
@@ -84,28 +85,32 @@ def array_to_audio_input(
     )
 
 
-def empty(global_options=None):
+def empty(global_options: dict = None) -> FFmpegArgs:
     """create empty ffmpeg arg dict
 
     :param global_options: global options, defaults to None
-    :type global_options: dict, optional
     :return: empty ffmpeg arg dict with 'inputs','outputs',and 'global_options' entries.
-    :rtype: dict
     """
     return {"inputs": [], "outputs": [], "global_options": global_options}
 
 
-def check_url(url, nodata=True, nofileobj=False, format=None):
+def check_url(
+    url: FFmpegUrlType | FilterGraphObject | FFConcat | memoryview | IOBase,
+    nodata: bool = True,
+    nofileobj: bool = False,
+    format: str | None = None,
+    pipe_str: str | None = "-",
+) -> tuple[
+    FFmpegUrlType | FilterGraphObject | FFConcat, IOBase | None, memoryview | None
+]:
     """Analyze url argument for non-url input
 
     :param url: url argument string or data or file or a custom class
-    :type url: str, bytes-like object, audio or video data object, file-like object, or pipe input custom object
     :param nodata: True to raise exception if url is a bytes-like object, default to True
-    :type nodata: bool, optional
     :param nofileobj: True to raise exception if url is a file-like object, default to False
-    :type nofileobj: bool, optional
+    :param format: FFmpeg format option, default to None (unspecified)
+    :param pipe_str: specify an alternate FFmpeg pipe url or None to leave it blank, default to '-'
     :return: url string, file object, and data object
-    :rtype: tuple<str, file-like object or None, bytes-like object or None>
 
     Custom Pipe Class
     -----------------
@@ -145,21 +150,21 @@ def check_url(url, nodata=True, nofileobj=False, format=None):
     return url, fileobj, data
 
 
-def add_url(args, type, url, opts=None, update=False):
+def add_url(
+    args: FFmpegArgs,
+    type: Literal["input", "output"],
+    url: str,
+    opts: dict[str, Any] | None = None,
+    update: bool = False,
+) -> tuple[int, tuple[str, dict | None]]:
     """add new or modify existing url to input or output list
 
     :param args: ffmpeg arg dict (modified in place)
-    :type args: dict
     :param type: input or output
-    :type type: 'input' or 'output'
     :param url: url of the new entry
-    :type url: str
     :param opts: FFmpeg options associated with the url, defaults to None
-    :type opts: dict, optional
     :param update: True to update existing input of the same url, default to False
-    :type update: bool, optional
     :return: file index and its entry
-    :rtype: tuple(int, tuple(str, dict or None))
     """
 
     type = f"{type}s"
@@ -183,19 +188,14 @@ def add_url(args, type, url, opts=None, update=False):
     return id, filelist[id]
 
 
-def has_filtergraph(args, type):
+def has_filtergraph(args: FFmpegArgs, type: Literal["audio", "video"]) -> bool:
     """True if FFmpeg arguments specify a filter graph
 
     :param args: FFmpeg argument dict
-    :type args: dict
     :param type: filter type
-    :type type: 'video' or 'audio'
     :param file_id: specify output file id (ignored if type=='complex'), defaults to None (or 0)
-    :type file_id: int, optional
     :param stream_id: stream, defaults to None
-    :type stream_id: int, optional
     :return: True if filter graph is specified
-    :rtype: bool
     """
     try:
         if (
@@ -803,7 +803,7 @@ def add_urls(
 def add_filtergraph(
     args: FFmpegArgs,
     filtergraph: Graph,
-    map: Sequence[StreamSpecDict] | None = None,
+    map: Sequence[str] | None = None,
     automap: bool = True,
     append_filter: bool = True,
     append_map: bool = True,
