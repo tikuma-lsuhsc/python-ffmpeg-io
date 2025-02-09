@@ -168,3 +168,73 @@ def is_fileobj(
         raise ValueError("Requested non-writable file object but it is writable.")
 
     return True
+
+def escape(txt: str) -> str:
+    """apply FFmpeg single quote escaping
+
+    :param txt: Unescaped string
+    :return: Escaped string
+
+    See https://ffmpeg.org/ffmpeg-utils.html#Quoting-and-escaping
+    """
+
+    txt = str(txt)
+
+    if re.search(r"\s", txt, re.MULTILINE):
+        # quote if txt has any white space
+        txt = txt.replace("'", r"'\''")
+        return f"'{txt}'"
+    else:
+        # if not quoted, escape quotes and backslashes
+        return re.sub(r"(['\\])", r"\\\1", txt)
+
+
+def unescape(txt: str) -> str:
+    """undo FFmpeg single quote escaping
+
+    :param txt: Escaped string
+    :return: Original string
+
+    See https://ffmpeg.org/ffmpeg-utils.html#Quoting-and-escaping
+    """
+
+    n = len(txt)
+    if not n:
+        return txt
+
+    re_start = re.compile(r"[^\\](?:\\\\)*'")
+    re_sub = re.compile(r"\\([\\'])")
+
+    blks = []
+
+    # look for a first quoted text block
+    m = re.search(r"(?:^|[^\\])(?:\\\\)*'", txt)
+    if m:
+        i0 = m.end()
+        if i0 > 1:
+            # unescape the initial unquoted block
+            blks.append(re_sub.sub(r"\1", txt[0 : i0 - 1]))
+    else:
+        # no quoted text block, unescape the whole string
+        return re_sub.sub(r"\1", txt)
+
+    # always starts with quoted block
+    in_quote = True
+
+    while i0 < n:
+
+        if in_quote:
+            # find the end quote
+            i1 = txt.find("'", i0)
+            if i1 < 0:
+                raise ValueError("incorrectly escaped text: missing a closing quote.")
+            blks.append(txt[i0:i1])
+        else:
+            # find the next starting quote
+            m = re_start.search(txt, i0 - 1)
+            i1 = m.end() - 1 if m else n
+            blks.append(re_sub.sub(r"\1", txt[i0:i1]))
+        i0 = i1 + 1
+        in_quote = not in_quote
+
+    return "".join(blks)

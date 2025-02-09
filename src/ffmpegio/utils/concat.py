@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger("ffmpegio")
 
-from . import escape, unescape
+from .._utils import escape, unescape
 
 # https://trac.ffmpeg.org/wiki/Concatenate
 # https://ffmpeg.org/ffmpeg-formats.html#concat
