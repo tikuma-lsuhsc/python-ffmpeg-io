@@ -161,7 +161,7 @@ def add_url(
             (
                 opts and {**opts}
                 if filelist[id][1] is None
-                else {**filelist[id][1], **opts}
+                else filelist[id][1] if opts is None else {**filelist[id][1], **opts}
             ),
         )
     return id, filelist[id]
