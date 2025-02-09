@@ -281,7 +281,12 @@ class LoggerThread(Thread):
 
 
 class ReaderThread(Thread):
-    def __init__(self, stdout, nmin=None, queuesize=None):
+    def __init__(
+        self,
+        stdout: BinaryIO,
+        nmin: int | None = None,
+        queuesize: int | None = None,
+    ):
         super().__init__()
         self.stdout = stdout  #:readable stream: data source
         self.nmin = nmin  #:positive int: expected minimum number of read()'s n arg (not enforced)
@@ -349,15 +354,12 @@ class ReaderThread(Thread):
                 self._queue.put(data)
                 # print(f"reader thread: queued samples")
 
-    def read(self, n=-1, timeout=None):
+    def read(self, n: int = -1, timeout: float | None = None) -> bytes:
         """read n samples
 
         :param n: number of samples/frames to read, if non-positive, read all, defaults to -1
-        :type n: int, optional
         :param timeout: timeout in seconds, defaults to None
-        :type timeout: float, optional
         :return: n*itemsize bytes
-        :rtype: bytes
         """
 
         # wait till matching line is read by the thread
@@ -408,7 +410,7 @@ class ReaderThread(Thread):
             self._carryover = all_data[nbytes:]
         return all_data[:nbytes]
 
-    def read_all(self, timeout=None):
+    def read_all(self, timeout: float | None = None) -> bytes:
         # wait till matching line is read by the thread
         if timeout is not None:
             timeout = time() + timeout
