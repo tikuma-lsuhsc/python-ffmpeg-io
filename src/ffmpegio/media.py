@@ -8,7 +8,7 @@ from .utils.typing import (
     RawStreamDef,
     ProgressCallable,
     RawDataBlob,
-    StreamSpec,
+    StreamSpecDict,
 )
 
 import contextlib

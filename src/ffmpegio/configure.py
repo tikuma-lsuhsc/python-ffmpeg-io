@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .utils.typing import Literal, Any, FFmpegArgs, StreamSpec
+from .utils.typing import Literal, Any, FFmpegArgs, StreamSpecDict
 from collections.abc import Sequence
 
 from fractions import Fraction
@@ -758,7 +758,7 @@ def add_urls(
 def add_filtergraph(
     args: FFmpegArgs,
     filtergraph: Graph,
-    map: Sequence[StreamSpec] | None = None,
+    map: Sequence[StreamSpecDict] | None = None,
     automap: bool = True,
     append_filter: bool = True,
     append_map: bool = True,

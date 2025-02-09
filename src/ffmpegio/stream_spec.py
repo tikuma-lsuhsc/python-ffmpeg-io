@@ -9,11 +9,11 @@ from __future__ import annotations
 from typing import get_args, Literal, TypedDict, Union, Tuple
 from ._typing import MediaType, NotRequired
 
-StreamSpecMediaType = Literal["v", "a", "s", "d", "t", "V"]
+StreamSpecDictMediaType = Literal["v", "a", "s", "d", "t", "V"]
 # libavformat/avformat.c:match_stream_specifier()
 
 
-class StreamSpec_Options(TypedDict):
+class StreamSpecDict_Options(TypedDict):
     media_type: NotRequired[MediaType]  # py3.11 NotRequired[MediaType]
     program_id: NotRequired[int]  # py3.11 NotRequired[int]
     group_index: NotRequired[int]  # py3.11 NotRequired[int]
@@ -21,19 +21,19 @@ class StreamSpec_Options(TypedDict):
     stream_id: NotRequired[int]  # py3.11 NotRequired[int]
 
 
-class StreamSpec_Index(StreamSpec_Options):
+class StreamSpecDict_Index(StreamSpecDict_Options):
     index: int
 
 
-class StreamSpec_Tag(StreamSpec_Options):
+class StreamSpecDict_Tag(StreamSpecDict_Options):
     tag: Union[str, Tuple[str, str]]
 
 
-class StreamSpec_Usable(StreamSpec_Options):
+class StreamSpecDict_Usable(StreamSpecDict_Options):
     usable: bool
 
 
-StreamSpec = Union[StreamSpec_Index, StreamSpec_Tag, StreamSpec_Usable]
+StreamSpecDict = Union[StreamSpecDict_Index, StreamSpecDict_Tag, StreamSpecDict_Usable]
 
 #################################
 

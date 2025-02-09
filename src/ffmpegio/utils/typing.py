@@ -10,7 +10,7 @@ MediaType = Literal["v", "a", "s", "d", "t", "V"]
 # libavformat/avformat.c:match_stream_specifier()
 
 
-from ..stream_spec import StreamSpec
+from ..stream_spec import StreamSpecDict
 
 RawDataBlob = Any  # depends on raw data reader plugin
 
