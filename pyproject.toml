@@ -30,7 +30,7 @@ dependencies = [
     "pluggy",
     "packaging",
     "typing_extensions",
-    "namedpipe"
+    "namedpipe >= 0.2"
 ]
 
 [project.urls]

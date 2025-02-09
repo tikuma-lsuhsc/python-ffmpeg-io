@@ -4,6 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
+from io import IOBase
+from pathlib import Path
+from namedpipe import NPopen
+import urllib.parse
+
+import re
+
 try:
     from math import prod
 except:
@@ -97,3 +104,67 @@ def deprecate_core():
     warnings.warn(
         message="!!PACKAGE CONFLICT!! ffmpegio-core distribution package has been deprecated. Please read the following link for the instructions: https://github.com/python-ffmpegio/python-ffmpegio/wiki/Instructions-to-upgrade-to-v0.11.0."
     )
+
+
+def is_url(value: Any, *, pipe_ok: bool = False) -> bool:
+    """True if input/output url string path parsed URL
+    :param pipe_ok: True to allow FFmpeg pipe protocol string"""
+    return (
+        pipe_ok or not is_pipe(value)
+        if isinstance(value, str)
+        else isinstance(value, (Path, urllib.parse.ParseResult))
+    )
+
+
+def is_pipe(value: Any) -> bool:
+    """True if FFmpeg pipe protocol string"""
+    return value == "-" or bool(re.match(r"pipe\:\d*", value))
+
+
+def is_namedpipe(
+    value: Any, *, readable: bool | None = None, writable: bool | None = None
+) -> bool:
+    """True if named pipe object
+
+    :param readable: True to test for readable pipe, False to test for non-readable pipe, defaults to None (either)
+    :param writable: True to test for writable pipe, False to test for non-writable pipe, defaults to None (either)
+    """
+    return (
+        isinstance(value, NPopen)
+        and (readable is None or value.readable() is readable)
+        and (writable is None or value.writable() is writable)
+    )
+
+
+def is_fileobj(
+    value: Any,
+    *,
+    seekable: bool | None = None,
+    readable: bool | None = None,
+    writable: bool | None = None,
+) -> bool:
+    """True if file object
+
+    :param readable: True to test for readable pipe, False to test for non-readable pipe, defaults to None (either)
+    :param writable: True to test for writable pipe, False to test for non-writable pipe, defaults to None (either)
+    """
+
+    if not isinstance(value, IOBase):
+        return False
+
+    if seekable is True and not value.seekable():
+        raise ValueError("Requested seekable file object but it's not seekable.")
+    elif seekable is False and value.seekable():
+        raise ValueError("Requested non-seekable file object but it is seekable.")
+
+    if readable is True and not value.readable():
+        raise ValueError("Requested readable file object but it's not readable.")
+    elif readable is False and value.readable():
+        raise ValueError("Requested non-readable file object but it is readable.")
+
+    if writable is True and not value.writable():
+        raise ValueError("Requested writable file object but it's not writable.")
+    elif writable is False and value.writable():
+        raise ValueError("Requested non-writable file object but it is writable.")
+
+    return True
