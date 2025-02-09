@@ -378,7 +378,7 @@ class ReaderThread(Thread):
         """
 
         # wait till matching line is read by the thread
-        block = self.is_alive() and n != 0
+        block = (self.is_alive() and self._collect) and n != 0
         if timeout is not None:
             timeout = time() + timeout
 
@@ -439,7 +439,7 @@ class ReaderThread(Thread):
         while True:
             # if not self.is_alive() or timeout and timeout > time():
             try:
-                data = self._queue.get(self.is_alive(), timeout and timeout - time())
+                data = self._queue.get(self.is_alive() and self._collect, timeout and timeout - time())
                 self._queue.task_done()
                 assert data is not None
                 arrays.append(data)
