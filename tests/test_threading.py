@@ -22,6 +22,25 @@ def test_log_popen():
         pprint(logger.output_stream(0, 0))
 
 
+def test_copyfileobj():
+    url = "tests/assets/testaudio-1m.mp3"
+    with (
+        TemporaryDirectory() as tmpdir,
+        open(url, "rb") as fsrc,
+        open(path.join(tmpdir, "out.mp3"), "w+b") as fdst,
+        threading.CopyFileObjThread(fsrc, fdst) as copier,
+    ):
+
+        copier.join()
+
+        fsrc.seek(0)
+        data = fsrc.read()
+        fdst.seek(0)
+        data_out = fdst.read()
+        
+    assert data == data_out
+
+
 if __name__ == "__main__":
 
     url = "tests/assets/testmulti-1m.mp4"

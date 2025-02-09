@@ -13,6 +13,7 @@ from time import sleep, time
 from tempfile import TemporaryDirectory
 from queue import Empty, Full, Queue
 from math import ceil
+from shutil import copyfileobj
 import logging
 
 from namedpipe import NPopen
@@ -785,3 +786,43 @@ class AviReaderThread(Thread):
             )
 
         return out
+
+
+class CopyFileObjThread(Thread):
+    """run shutil.copyfileobj in the thread
+
+    :param fsrc: source file object
+    :param fout: destination file object
+    :param length: The integer length, if given, is the buffer size. In particular, a negative length
+                    value means to copy the data without looping over the source data in chunks;
+                    defaults to 0; the data is read in chunks to avoid uncontrolled memory consumption.
+
+    Thread terminates when the copy operation is completed.
+
+    Note that if the current file position of the fsrc object is not 0,
+    only the contents from the current file position to the end of the file will be copied.
+    """
+
+    def __init__(
+        self, fsrc: BinaryIO | NPopen, fdst: BinaryIO | NPopen, length: int = 0
+    ):
+
+        super().__init__()
+        self._fsrc = fsrc
+        self._fdst = fdst
+        self.length = length
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, *_):
+        self.join()
+        return self
+
+    def run(self):
+        src_is_namedpipe = isinstance(self._fsrc, NPopen)
+        src = self._fsrc.wait() if src_is_namedpipe else self._fsrc
+        dst_is_namedpipe = isinstance(self._fdst, NPopen)
+        dst = self._fdst.wait() if dst_is_namedpipe else self._fdst
+        copyfileobj(src, dst, self.length)
