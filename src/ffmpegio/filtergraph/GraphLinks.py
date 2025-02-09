@@ -5,7 +5,7 @@ from collections import UserDict
 from collections.abc import Generator, Mapping, Sequence, Callable
 
 
-from ..utils import is_stream_spec
+from ..utils import is_map_spec
 from ..errors import FFmpegioError
 from .typing import PAD_INDEX, PAD_PAIR, Literal
 
@@ -70,7 +70,7 @@ class GraphLinks(UserDict):
                 )
         else:
             try:
-                if no_stream_spec or not is_stream_spec(label):
+                if no_stream_spec or not is_map_spec(label, allow_missing_file_id=True):
                     assert re.match(r"[a-zA-Z0-9_]+$", label)
             except Exception as e:
                 raise GraphLinks.Error(
@@ -138,12 +138,12 @@ class GraphLinks(UserDict):
         for label, pads in data.items():
 
             if (
-                not is_stream_spec(label)
+                not is_map_spec(label, allow_missing_file_id=True)
                 and pads[0] is not None
                 and isinstance(pads[0][0], tuple)
             ):
                 raise GraphLinks.Error(
-                    "Only stream specifier labels can have multiple input pads."
+                    "Only map specifier labels can have multiple input pads."
                 )
 
             GraphLinks.validate_item(label, pads)
@@ -330,7 +330,7 @@ class GraphLinks(UserDict):
             except ValueError:
                 return 0
 
-        if check_stream_spec and is_stream_spec(label):
+        if check_stream_spec and is_map_spec(label, allow_missing_file_id=True):
             return label
 
         if not force and label in self:
@@ -439,7 +439,7 @@ class GraphLinks(UserDict):
         """
 
         def iter(label, inpad, outpad):
-            if outpad is not None or (include_input_stream and is_stream_spec(label)):
+            if outpad is not None or (include_input_stream and is_map_spec(label, allow_missing_file_id=True)):
                 for d in self.iter_inpad_ids(inpad):
                     yield (label, d, outpad)
 
@@ -461,7 +461,7 @@ class GraphLinks(UserDict):
         :yield: label and pad index
         """
         for label, (inpad, outpad) in self.data.items():
-            if outpad is None and not (exclude_stream_specs and is_stream_spec(label)):
+            if outpad is None and not (exclude_stream_specs and is_map_spec(label, allow_missing_file_id=True)):
                 for d in self.iter_inpad_ids(inpad):
                     yield (label, d)
 
@@ -472,7 +472,7 @@ class GraphLinks(UserDict):
         :yield: label and pad index
         """
         for label, (inpad, outpad) in self.data.items():
-            if outpad is None and is_stream_spec(label):
+            if outpad is None and is_map_spec(label, allow_missing_file_id=True):
                 for d in self.iter_inpad_ids(inpad):
                     yield (label, d)
 
@@ -651,7 +651,7 @@ class GraphLinks(UserDict):
         if (outpad is None) == (inpad is None):
             raise ValueError("outpad or inpad (but not both) must be given.")
 
-        is_stspec = is_stream_spec(label)
+        is_stspec = is_map_spec(label, allow_missing_file_id=True)
         if not is_stspec:
             label = self._resolve_label(label, force=force, check_stream_spec=False)
 

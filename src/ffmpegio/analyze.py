@@ -11,7 +11,7 @@ logger = logging.getLogger("ffmpegio")
 
 from . import configure
 from .filtergraph import Graph, Filter, Chain, as_filtergraph
-from .utils.filter import compose_filter
+from .filtergraph.utils import compose_filter
 from .errors import FFmpegError
 from .path import devnull
 from . import ffmpegprocess as fp

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..utils import filter as filter_utils
+from . import utils as filter_utils
 
 from .exceptions import FiltergraphConversionError, FiltergraphInvalidExpression
 from .. import filtergraph as fgb

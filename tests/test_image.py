@@ -2,6 +2,8 @@ from ffmpegio import image, probe, transcode, FFmpegError
 import tempfile, re
 from os import path
 
+from ffmpegio.filtergraph import utils as filter_utils
+
 outext = ".png"
 
 
@@ -122,7 +124,7 @@ if __name__ == "__main__":
     from matplotlib import pyplot as plt
     import logging
     from ffmpegio import utils, ffmpegprocess
-    from ffmpegio.utils import filter as filter_utils, log as log_utils
+    from ffmpegio.utils import log as log_utils
 
     # logging.basicConfig(level=logging.DEBUG)
 

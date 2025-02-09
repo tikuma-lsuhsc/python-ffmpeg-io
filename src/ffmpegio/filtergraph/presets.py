@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from ..utils.typing import TYPE_CHECKING, Any, StreamSpec
+from ..typing import TYPE_CHECKING, Any, StreamSpecDict
 
 from collections.abc import Sequence
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 def merge_audio(
-    streams: dict[StreamSpec, dict[str, Any]],
+    streams: dict[StreamSpecDict, dict[str, Any]],
     output_ar: int | None = None,
     output_sample_fmt: str | None = None,
     output_pad_label: str | None = "aout",

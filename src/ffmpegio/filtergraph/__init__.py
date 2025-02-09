@@ -168,3 +168,24 @@ def __getattr__(name):
         _filters[name] = func
 
     return func
+
+# TODO
+# def validate_input_filtergraph(fg):
+
+#     for idx, f, _ in fg.iter_output_pads():
+#         label = fg.get_label(outpad=idx)
+#         if label is None:  # '[Out0]'
+#             if 0 in outlabels:
+#                 raise ValueError(
+#                     "Invalid input filtergraph. Only one unlabeled output allowed."
+#                 )
+#             st = 0
+#         elif m := re.match(r"out(\d)+$", label):
+#             st = int(m[1])
+#         else:
+#             raise ValueError(
+#                 'Input filtergraph must be labelled as "outN" where N is a nonnegative integer, starting at 0.'
+#             )
+#         outlabels[st] = f.get_pad_media_type(port="out", pad_id=idx[-1])
+#     if (n := len(outlabels)) != max(outlabels) + 1:
+#         raise ValueError("Invalid input filtergraph. Missing output label(s).")

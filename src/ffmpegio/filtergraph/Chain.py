@@ -5,7 +5,7 @@ from collections.abc import Callable, Generator, Sequence
 
 from itertools import chain
 
-from ..utils import filter as filter_utils
+from . import utils as filter_utils
 from .. import filtergraph as fgb
 
 from .typing import PAD_INDEX, Literal

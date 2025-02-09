@@ -10,7 +10,9 @@ from math import floor, log10
 import os
 from tempfile import NamedTemporaryFile
 
-from ..utils import filter as filter_utils, is_stream_spec
+from . import utils as filter_utils
+
+from ..stream_spec import is_map_spec
 from .. import filtergraph as fgb
 
 from .typing import PAD_INDEX
@@ -526,7 +528,7 @@ class Graph(fgb.abc.FilterGraphObject, UserList):
             if (
                 not include_connected
                 and isinstance(other_pidx, str)
-                and is_stream_spec(other_pidx)
+                and is_map_spec(other_pidx, allow_missing_file_id=True)
             ):
                 continue
 

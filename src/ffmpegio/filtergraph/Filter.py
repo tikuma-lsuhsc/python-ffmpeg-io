@@ -6,11 +6,11 @@ from functools import partial
 from itertools import chain
 
 from ..caps import filters as list_filters, filter_info, layouts, FilterInfo
-from ..utils import filter as filter_utils
+from . import utils as filter_utils
 
 from .. import filtergraph as fgb
 
-from .typing import PAD_INDEX
+from .typing import PAD_INDEX, Literal
 from .exceptions import *
 
 __all__ = ["Filter"]
@@ -198,7 +198,9 @@ class Filter(fgb.abc.FilterGraphObject, tuple):
         except:
             raise Filter.InvalidName(self.name)
 
-    def get_pad_media_type(self, port, pad_id):
+    def get_pad_media_type(
+        self, port: Literal["input", "output"], pad_id: int
+    ) -> Literal["audio", "video"]:
         try:
             port = (
                 "inputs"

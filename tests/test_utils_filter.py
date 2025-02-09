@@ -3,7 +3,7 @@ from ffmpegio.caps import filters
 
 logging.basicConfig(level=logging.INFO)
 
-from ffmpegio.utils import filter as filter_utils
+from ffmpegio.filtergraph import utils as filter_utils
 from pprint import pprint
 import pytest
 
