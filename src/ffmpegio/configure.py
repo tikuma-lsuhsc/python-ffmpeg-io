@@ -110,13 +110,13 @@ def check_url(
         try:
             memoryview(url)
             data = url
-            url = "-"
+            url = pipe_str
         except:
             if hasmethod(url, "fileno"):
                 if nofileobj:
                     raise ValueError("File-like object cannot be specified as url.")
                 fileobj = url
-                url = "-"
+                url = pipe_str
             elif str(url) in ("-", "pipe:", "pipe:0"):
                 try:
                     data = url.input
