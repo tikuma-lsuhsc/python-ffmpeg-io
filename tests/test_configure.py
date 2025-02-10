@@ -4,7 +4,7 @@ from ffmpegio import configure
 
 vid_url = "tests/assets/testvideo-1m.mp4"
 img_url = "tests/assets/ffmpeg-logo.png"
-aud_url = "tests/assets/testaudio-1m.wav"
+aud_url = "tests/assets/testaudio-1m.mp3"
 mul_url = "tests/assets/testmulti-1m.mp4"
 
 
@@ -188,3 +188,35 @@ def test_analyze_input_url_arg(url, opts, defopts, ret):
     finally:
         if open_file:
             fileobj.close()
+
+
+@pytest.mark.parametrize(
+    ("inputs", "input_info", "filters_complex", "ret"),
+    [
+        (
+            [(mul_url, None)],
+            [{"src_type": "url"}],
+            None,
+            {f"0:{i}": mtype for i, mtype in mul_streams},
+        ),
+        (
+            [(vid_url, None), (aud_url, {})],
+            [{"src_type": "url"}, {"src_type": "url"}],
+            None,
+            {"0:0": "video", "1:0": "audio"},
+        ),
+        (
+            [(mul_url, None)],
+            [{"src_type": "url"}],
+            ["split=n=2"],
+            {"[out0]": "video", "[out1]": "video"},
+        ),
+    ],
+)
+def test_auto_map(inputs, input_info, filters_complex, ret):
+    args = configure.empty()
+    args["inputs"].extend(inputs)
+    if filters_complex is not None:
+        args["global_options"] = {"filter_complex": filters_complex}
+    out = configure.auto_map(args, input_info)
+    assert out == ret
