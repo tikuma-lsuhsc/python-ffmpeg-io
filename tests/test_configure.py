@@ -153,3 +153,38 @@ def test_retrieve_input_stream_ids(info, url, opts, media_type, ret):
             info["fileobj"].close()
 
     assert out == ret
+
+
+@pytest.mark.parametrize(
+    ("url", "opts", "defopts", "ret"),
+    [
+        (mul_url, None, {}, ((mul_url, {}), {"src_type": "url"})),
+        (mul_url, None, {}, ((None, {}), {"src_type": "fileobj"})),
+        (mul_url, None, {}, ((None, {}), {"src_type": "buffer"})),
+        (
+            "color=c=pink [out0]",
+            None,
+            {"f": "lavfi"},
+            (("color=c=pink [out0]", {"f": "lavfi"}), {"src_type": "filtergraph"}),
+        ),
+    ],
+)
+def test_analyze_input_url_arg(url, opts, defopts, ret):
+
+    info = ret[1]
+    open_file = info["src_type"] in ("fileobj", "buffer")
+    try:
+        if open_file:
+            fileobj = open(url, "rb")
+            if info["src_type"] == "buffer":
+                info["buffer"] = url = fileobj.read()
+            else:
+                url = info["fileobj"] = fileobj
+        out = configure.analyze_input_url_arg(
+            url if opts is None else (url, opts), defopts
+        )
+        assert out == ret
+
+    finally:
+        if open_file:
+            fileobj.close()

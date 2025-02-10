@@ -891,6 +891,63 @@ def add_filtergraph(
 
 
 
+def analyze_input_url_arg(
+    url_opts: FFmpegInputUrlComposite | tuple[FFmpegInputUrlComposite, dict],
+    inopts_default: dict[str, Any],
+) -> tuple[tuple[FFmpegUrlType | FilterGraphObject | None, dict], InputSourceDict]:
+    """analyze and process heterogeneous input url argument
+
+    :param url: composite input url argument
+    :param inopts_default: default input options
+    :return: tuple of an FFmpeg inputs entry and input source info. If input is not a url,
+             the first element of the FFmpeg inputs entry is None. An appropriate pipe url
+             must be set afterwards.
+    """
+
+    # get the option dict
+    if utils.is_non_str_sequence(url_opts, (str, FilterGraphObject, Buffer)):
+        if len(url_opts) != 2:
+            raise ValueError("url-options pair input must be a tuple of the length 2.")
+        url, opts = url_opts
+        opts = inopts_default if opts is None else {**inopts_default, **opts}
+    else:
+        # only URL given
+        url, opts = url_opts, inopts_default
+
+    # check url (must be url and not fileobj)
+    is_fg = isinstance(url, FilterGraphObject)
+    if is_fg or ("lavfi" == opts.get("f", None) and isinstance(url, str)):
+        if is_fg:
+            if "f" not in opts:
+                opts["f"] = "lavfi"
+            elif opts["f"] != "lavfi":
+                raise ValueError(
+                    "input filtergraph must use the `'lavfi'` input format."
+                )
+
+        input_info = {"src_type": "filtergraph"}
+
+    elif utils.is_fileobj(url, readable=True):
+        input_info = {"src_type": "fileobj", "fileobj": url}
+        url = None
+    elif utils.is_url(url, pipe_ok=False):
+        input_info = {"src_type": "url"}
+    elif isinstance(url, FFConcat):
+        # convert to buffer
+        input_info = {"src_type": "buffer", "buffer": FFConcat.input}
+        url = None
+    else:
+        try:
+            buffer = memoryview(url)
+        except:
+            raise ValueError("Given input URL argument is not supported.")
+        else:
+            input_info = {"src_type": "buffer", "buffer": buffer}
+            url = None
+
+    return (url, opts), input_info
+
+
 def retrieve_input_stream_ids(
     info: InputSourceDict,
     url: FFmpegUrlType | FilterGraphObject | None,
