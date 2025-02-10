@@ -1,8 +1,11 @@
+import pytest
+
 from ffmpegio import configure
 
 vid_url = "tests/assets/testvideo-1m.mp4"
 img_url = "tests/assets/ffmpeg-logo.png"
 aud_url = "tests/assets/testaudio-1m.wav"
+mul_url = "tests/assets/testmulti-1m.mp4"
 
 
 def test_array_to_audio_input():
@@ -120,3 +123,33 @@ def test_video_basic_filter():
             # transpose="clock",
         )
     )
+
+
+mul_streams = [(0, "video"), (1, "audio"), (2, "video"), (3, "audio")]
+mul_vid_streams = [mul_streams[0], mul_streams[2]]
+
+
+@pytest.mark.parametrize(
+    ("info", "url", "opts", "media_type", "ret"),
+    [
+        ({"src_type": "url"}, mul_url, {}, None, mul_streams),
+        ({"src_type": "url"}, mul_url, {}, "video", mul_vid_streams),
+        ({"src_type": "fileobj"}, mul_url, {}, "video", mul_vid_streams),
+        ({"src_type": "buffer"}, mul_url, {}, "video", mul_vid_streams),
+        ({"src_type": "filtergraph"}, "color=c=pink [out0]", {}, None, [(0, "video")]),
+    ],
+)
+def test_retrieve_input_stream_ids(info, url, opts, media_type, ret):
+
+    open_file = info["src_type"] in ("fileobj", "buffer")
+    try:
+        if open_file:
+            info["fileobj"] = open(url, "rb")
+            if info["src_type"] == "buffer":
+                info["buffer"] = info["fileobj"].read()
+        out = configure.retrieve_input_stream_ids(info, url, opts, media_type)
+    finally:
+        if open_file:
+            info["fileobj"].close()
+
+    assert out == ret

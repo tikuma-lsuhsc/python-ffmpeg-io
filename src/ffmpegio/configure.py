@@ -887,4 +887,64 @@ def add_filtergraph(
                 else [existing_map, *map]
             )
 
-        outopts['map'] = map
+
+
+def retrieve_input_stream_ids(
+    info: InputSourceDict,
+    url: FFmpegUrlType | FilterGraphObject | None,
+    opts: dict,
+    media_type: MediaType | None = None,
+) -> list[tuple[int, MediaType]]:
+    """Retrieve ids and media types of streams in an input source
+
+    :param info: input file source information
+    :param url: URL or local file path of the input media file/device. None if data is provided via pipe
+                and data is in the `info` argument
+    :param opts: FFmpeg input options
+    :param media_type: Desired stream media type, default to None (=all available streams)
+    :return: A list of indices and media types of the input streams. 
+             Maybe empty if failed to probe the media (e.g., data inaccessible 
+             or in an ffprobe incompatible format, e.g., ffconcat)
+    """
+
+    src_type = info["src_type"]
+    if src_type == "filtergraph":
+        return utils.analyze_input_filtergraph_ids(url)
+
+    # file/network input - process only if seekable
+    sp_kwargs = {}  # ffprobe subprocess keywords
+    if src_type != "url":
+        url = "pipe:0"
+        if src_type == "buffer":
+            sp_kwargs["input"] = info["buffer"]
+        elif src_type == "fileobj":
+            f = info["fileobj"]
+            if not (f.readable() and f.seekable()):
+                logger.warning("file object must be seekable.")
+                return []
+            pos = f.tell()
+            sp_kwargs["stdin"] = f
+        else:
+            logger.warning("unknown input source type.")
+            return []
+
+    media_types = ("audio", "video") if media_type is None else (media_type,)
+
+    # get the stream list if ffprobe can
+    try:
+        stream_ids = [
+            (i, info["codec_type"])
+            for i, info in enumerate(
+                probe.streams_basic(url, f=opts.get("f", None), sp_kwargs=sp_kwargs)
+            )
+            if info["codec_type"] in media_types
+        ]
+    except:
+        # if failed, return empty
+        logger.warning("ffprobe failed.")
+        stream_ids = []
+
+    if src_type == "fileobj":
+        # restore the read cursor position
+        f.seek(pos)
+    return stream_ids
