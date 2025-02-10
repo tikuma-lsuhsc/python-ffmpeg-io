@@ -69,13 +69,10 @@ class GraphLinks(UserDict):
                     "A pad label without a link must be a string label."
                 )
         else:
-            try:
-                if no_stream_spec or not is_map_spec(label, allow_missing_file_id=True):
-                    assert re.match(r"[a-zA-Z0-9_]+$", label)
-            except Exception as e:
+            if not (isinstance(label, str) and len(label)):
                 raise GraphLinks.Error(
-                    f'{label=} is not a valid link label. A link label must be a string with only alphanumeric and "_" characters'
-                ) from e
+                    "Pad label must be a string and has at least one character."
+                )
 
     @staticmethod
     def validate_pad_idx(id: PAD_INDEX | None, none_ok: bool = True):
@@ -439,7 +436,9 @@ class GraphLinks(UserDict):
         """
 
         def iter(label, inpad, outpad):
-            if outpad is not None or (include_input_stream and is_map_spec(label, allow_missing_file_id=True)):
+            if outpad is not None or (
+                include_input_stream and is_map_spec(label, allow_missing_file_id=True)
+            ):
                 for d in self.iter_inpad_ids(inpad):
                     yield (label, d, outpad)
 
@@ -461,7 +460,9 @@ class GraphLinks(UserDict):
         :yield: label and pad index
         """
         for label, (inpad, outpad) in self.data.items():
-            if outpad is None and not (exclude_stream_specs and is_map_spec(label, allow_missing_file_id=True)):
+            if outpad is None and not (
+                exclude_stream_specs and is_map_spec(label, allow_missing_file_id=True)
+            ):
                 for d in self.iter_inpad_ids(inpad):
                     yield (label, d)
 
