@@ -77,5 +77,25 @@ def test_get_audio_format():
     assert cfg[0] == "<i2" and cfg[1] == (2,)
 
 
+@pytest.mark.parametrize(
+    ("fg", "ret"),
+    [
+        ("color=c=pink", [(0, "video")]),
+        (
+            "testsrc [out0]; testsrc,hflip [out1]; testsrc,negate [out2]",
+            [(0, "video"), (1, "video"), (2, "video")],
+        ),
+        ("amovie=test.wav", [(0, "audio")]),
+        ("movie=test.avi[out0];amovie=test.wav[out1]", [(0, "video"), (1, "audio")]),
+        ("movie=test.avi:s='v:0+a:0'[out0][out1]", [(0, "video"), (1, "audio")]),
+        ("movie=test.ts[out0+subcc]", [(0, "video")]),
+    ],
+)
+def test_analyze_input_filtergraph_ids(fg, ret):
+
+    out = utils.analyze_input_filtergraph_ids(fg)
+    assert out == ret
+
+
 if __name__ == "__main__":
     import re
