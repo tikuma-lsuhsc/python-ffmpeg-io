@@ -19,29 +19,34 @@ import re, logging
 
 logger = logging.getLogger("ffmpegio")
 
-from . import utils, plugins, probe
+from io import IOBase
+from . import utils
 from . import filtergraph as fgb
 from .filtergraph.abc import FilterGraphObject
 from .utils.concat import FFConcat  # for typing
 from ._utils import as_multi_option, is_non_str_sequence
 
+#################################
+## module types
+
 UrlType = Literal["input", "output"]
 FFmpegInputType = Literal["url", "filtergraph", "buffer", "fileobj"]
 FFmpegOutputType = Literal["url", "fileobj"]
 
-FFmpegInputUrlComposite = Union[FFmpegUrlType, FilterGraphObject, IO, Buffer]
+FFmpegInputUrlComposite = Union[FFmpegUrlType, FFConcat, FilterGraphObject, IO, Buffer]
 FFmpegOutputUrlComposite = Union[FFmpegUrlType, IO]
+
+FFmpegInputOptionTuple = tuple[FFmpegUrlType | FilterGraphObject, dict | None]
+FFmpegOutputOptionTuple = tuple[FFmpegUrlType, dict | None]
 
 
 class FFmpegArgs(TypedDict):
     """FFmpeg arguments"""
 
-    inputs: list[
-        tuple[FFmpegUrlType | FilterGraphObject | FFConcat, dict | None]
-    ]  # list of input definitions (pairs of url and options)
-    outputs: list[
-        tuple[FFmpegUrlType, dict | None]
-    ]  # list of output definitions (pairs of url and options)
+    inputs: list[FFmpegInputOptionTuple]
+    # list of input definitions (pairs of url and options)
+    outputs: list[FFmpegOutputOptionTuple]
+    # list of output definitions (pairs of url and options)
     global_options: NotRequired[dict | None]  # FFmpeg global options
 
 
@@ -49,10 +54,13 @@ class InputSourceDict(TypedDict):
     """input source info"""
 
     src_type: FFmpegInputType  # True if file path/url
-    bytes: NotRequired[bytes]  # index of the source index
+    buffer: NotRequired[bytes]  # index of the source index
     fileobj: NotRequired[IO]  # file object
     pipe: NotRequired[NPopen]  # pipe
 
+
+#################################
+## module functions
 
 
 def array_to_video_input(
@@ -112,7 +120,7 @@ def empty(global_options: dict = None) -> FFmpegArgs:
 
 
 def check_url(
-    url: FFmpegUrlType | FilterGraphObject | FFConcat | memoryview | IOBase,
+    url: FFmpegInputUrlComposite,
     nodata: bool = True,
     nofileobj: bool = False,
     format: str | None = None,
@@ -170,10 +178,10 @@ def check_url(
 def add_url(
     args: FFmpegArgs,
     type: Literal["input", "output"],
-    url: str,
+    url: FFmpegUrlType,
     opts: dict[str, Any] | None = None,
     update: bool = False,
-) -> tuple[int, tuple[str, dict | None]]:
+) -> tuple[int, FFmpegInputOptionTuple | FFmpegOutputOptionTuple]:
     """add new or modify existing url to input or output list
 
     :param args: ffmpeg arg dict (modified in place)
@@ -205,7 +213,7 @@ def add_url(
     return id, filelist[id]
 
 
-def has_filtergraph(args: FFmpegArgs, type: Literal["audio", "video"]) -> bool:
+def has_filtergraph(args: FFmpegArgs, type: MediaType) -> bool:
     """True if FFmpeg arguments specify a filter graph
 
     :param args: FFmpeg argument dict
@@ -782,21 +790,15 @@ def add_urls(
     urls: str | tuple[str, dict | None] | Sequence[str | tuple[str, dict | None]],
     *,
     update: bool = False,
-) -> list[tuple[int, tuple[str, dict | None]]]:
+) -> list[tuple[int, FFmpegInputOptionTuple | FFmpegOutputOptionTuple]]:
     """add one or more urls to the input or output list at once
 
     :param args: ffmpeg arg dict (modified in place)
-    :type args: dict
     :param url_type: input or output
-    :type url_type: 'input' or 'output'
     :param urls: a sequence of urls (and optional dict of their options)
-    :type urls: str | tuple[str, dict] | Sequence[str | tuple[str, dict]]
     :param opts: FFmpeg options associated with the url, defaults to None
-    :type opts: dict, optional
     :param update: True to update existing input of the same url, default to False
-    :type update: bool, optional
     :return: list of file indices and their entries
-    :rtype: list[tuple[int, tuple[str, dict | None]]]
     """
 
     def process_one(url):
@@ -902,8 +904,8 @@ def retrieve_input_stream_ids(
                 and data is in the `info` argument
     :param opts: FFmpeg input options
     :param media_type: Desired stream media type, default to None (=all available streams)
-    :return: A list of indices and media types of the input streams. 
-             Maybe empty if failed to probe the media (e.g., data inaccessible 
+    :return: A list of indices and media types of the input streams.
+             Maybe empty if failed to probe the media (e.g., data inaccessible
              or in an ffprobe incompatible format, e.g., ffconcat)
     """
 
