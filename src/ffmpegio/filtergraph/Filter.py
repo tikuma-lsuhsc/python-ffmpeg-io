@@ -419,9 +419,13 @@ class Filter(fgb.abc.FilterGraphObject, tuple):
         def _list_var(opt, sep, inc):
             v = self.get_option_value(opt)
             return (
-                len(v)
-                if sep == r"\|" and not isinstance(v, str)
-                else len(re.split(rf"\s*{sep}\s*", v))
+                1
+                if v is None
+                else (
+                    len(v)
+                    if sep == r"\|" and not isinstance(v, str)
+                    else len(re.split(rf"\s*{sep}\s*", v))
+                )
             ) + inc
 
         def _channelsplit():
