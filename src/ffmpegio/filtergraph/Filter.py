@@ -9,6 +9,7 @@ from ..caps import filters as list_filters, filter_info, layouts, FilterInfo
 from . import utils as filter_utils
 
 from .. import filtergraph as fgb
+from ..stream_spec import parse_stream_spec
 
 from .typing import PAD_INDEX, Literal
 from .exceptions import *
@@ -255,8 +256,22 @@ class Filter(fgb.abc.FilterGraphObject, tuple):
 
             # multiple pads possible if streams option set
             if self.name in ("movie", "amovie"):
-                if self.get_option_value("streams") is None:
+                val = self.get_option_value("streams")
+                if val is None:
                     return "video" if self.name == "movie" else "audio"
+
+                spec = val.split("+")[pad_id]
+                return (
+                    "video"
+                    if spec == "dv"
+                    else (
+                        "audio"
+                        if spec == "da"
+                        else {"v": "video", "a": "audio", None: None}[
+                            parse_stream_spec(spec).get("media_type", None)
+                        ]
+                    )
+                )
 
             # 2nd pad for audio visualization stream
             vis_mode = ["afir", "aiir", "anequalizer", "ebur128", "aphasemeter"]
