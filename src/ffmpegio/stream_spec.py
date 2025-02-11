@@ -371,7 +371,9 @@ def map_option(
     
     map = str(input_file_id)
     if stream_specifier:
-        map = f'{map}:{stream_specifier}'
+        if isinstance(stream_specifier, dict):
+            stream_specifier = stream_spec(**stream_specifier)
+        map = f"{map}:{stream_specifier}"
     if negative:
         map = f'-{map}'
     if view_specifier:
