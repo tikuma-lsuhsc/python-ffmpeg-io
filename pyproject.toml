@@ -29,8 +29,8 @@ requires-python = ">=3.9"
 dependencies = [
     "pluggy",
     "packaging",
-    "typing_extensions",
-    "namedpipe >= 0.2"
+    "typing_extensions >= 4.12",
+    "namedpipe >= 0.2",
 ]
 
 [project.urls]
