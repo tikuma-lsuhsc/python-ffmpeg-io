@@ -318,7 +318,7 @@ def parse_map_option(map: str, *, input_file_id: int | None = None) -> MapOption
     return out
 
 
-def is_map_spec(spec: str, allow_missing_file_id: bool = False) -> bool:
+def is_map_option(spec: str, allow_missing_file_id: bool = False) -> bool:
     """True if valid stream specifier string
 
     :param spec: map specifier string to be tested

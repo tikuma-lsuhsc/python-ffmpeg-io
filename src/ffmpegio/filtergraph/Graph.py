@@ -12,7 +12,7 @@ from tempfile import NamedTemporaryFile
 
 from . import utils as filter_utils
 
-from ..stream_spec import is_map_spec
+from ..stream_spec import is_map_option
 from .. import filtergraph as fgb
 
 from .typing import PAD_INDEX
@@ -528,7 +528,7 @@ class Graph(fgb.abc.FilterGraphObject, UserList):
             if (
                 not include_connected
                 and isinstance(other_pidx, str)
-                and is_map_spec(other_pidx, allow_missing_file_id=True)
+                and is_map_option(other_pidx, allow_missing_file_id=True)
             ):
                 continue
 
