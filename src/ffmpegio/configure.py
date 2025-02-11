@@ -1067,7 +1067,7 @@ def retrieve_input_stream_ids(
     info: InputSourceDict,
     url: FFmpegUrlType | FilterGraphObject | None,
     opts: dict,
-    media_type: MediaType | None = None,
+    stream_spec: str | None = None,
 ) -> list[tuple[int, MediaType]]:
     """Retrieve ids and media types of streams in an input source
 
@@ -1075,7 +1075,7 @@ def retrieve_input_stream_ids(
     :param url: URL or local file path of the input media file/device. None if data is provided via pipe
                 and data is in the `info` argument
     :param opts: FFmpeg input options
-    :param media_type: Desired stream media type, default to None (=all available streams)
+    :param stream_spec: Specify streams to return
     :return: A list of indices and media types of the input streams.
              Maybe empty if failed to probe the media (e.g., data inaccessible
              or in an ffprobe incompatible format, e.g., ffconcat)
@@ -1102,16 +1102,16 @@ def retrieve_input_stream_ids(
             logger.warning("unknown input source type.")
             return []
 
-    media_types = ("audio", "video") if media_type is None else (media_type,)
-
     # get the stream list if ffprobe can
     try:
         stream_ids = [
-            (i, info["codec_type"])
-            for i, info in enumerate(
-                probe.streams_basic(url, f=opts.get("f", None), sp_kwargs=sp_kwargs)
+            (info["index"], info["codec_type"])
+            for info in probe.streams_basic(
+                url,
+                f=opts.get("f", None),
+                sp_kwargs=sp_kwargs,
+                stream_spec=stream_spec,
             )
-            if info["codec_type"] in media_types
         ]
     except:
         # if failed, return empty

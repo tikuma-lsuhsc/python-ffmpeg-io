@@ -130,16 +130,15 @@ mul_vid_streams = [mul_streams[0], mul_streams[2]]
 
 
 @pytest.mark.parametrize(
-    ("info", "url", "opts", "media_type", "ret"),
+    ("info", "url", "opts", "stream_spec", "ret"),
     [
         ({"src_type": "url"}, mul_url, {}, None, mul_streams),
-        ({"src_type": "url"}, mul_url, {}, "video", mul_vid_streams),
-        ({"src_type": "fileobj"}, mul_url, {}, "video", mul_vid_streams),
-        ({"src_type": "buffer"}, mul_url, {}, "video", mul_vid_streams),
+        ({"src_type": "fileobj"}, mul_url, {}, "v", mul_vid_streams),
+        ({"src_type": "buffer"}, mul_url, {}, "v", mul_vid_streams),
         ({"src_type": "filtergraph"}, "color=c=pink [out0]", {}, None, [(0, "video")]),
     ],
 )
-def test_retrieve_input_stream_ids(info, url, opts, media_type, ret):
+def test_retrieve_input_stream_ids(info, url, opts, stream_spec, ret):
 
     open_file = info["src_type"] in ("fileobj", "buffer")
     try:
@@ -147,7 +146,7 @@ def test_retrieve_input_stream_ids(info, url, opts, media_type, ret):
             info["fileobj"] = open(url, "rb")
             if info["src_type"] == "buffer":
                 info["buffer"] = info["fileobj"].read()
-        out = configure.retrieve_input_stream_ids(info, url, opts, media_type)
+        out = configure.retrieve_input_stream_ids(info, url, opts, stream_spec)
     finally:
         if open_file:
             info["fileobj"].close()
