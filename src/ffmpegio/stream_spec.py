@@ -6,8 +6,7 @@ parse & compose FFmpeg stream spec string from/to StreamSpec object
 
 from __future__ import annotations
 
-from typing import get_args, Literal, TypedDict, Union, Tuple
-from ._typing import MediaType, NotRequired
+from ._typing import get_args, Literal, TypedDict, Union, Tuple, MediaType, NotRequired
 
 import re
 
@@ -16,7 +15,7 @@ StreamSpecDictMediaType = Literal["v", "a", "s", "d", "t", "V"]
 
 
 class StreamSpecDict_Options(TypedDict):
-    media_type: NotRequired[MediaType]  # py3.11 NotRequired[MediaType]
+    media_type: NotRequired[StreamSpecDictMediaType]  # py3.11 NotRequired[MediaType]
     program_id: NotRequired[int]  # py3.11 NotRequired[int]
     group_index: NotRequired[int]  # py3.11 NotRequired[int]
     group_id: NotRequired[int]  # py3.11 NotRequired[int]
@@ -165,7 +164,6 @@ def is_stream_spec(spec: str | int) -> bool:
     """True if valid stream specifier string
 
     :param spec: stream specifier string to be tested
-    :param file_index: True if spec starts with a file index, None to allow with or without file_index defaults to False
     :return: True if valid stream specifier
     """
     try:
@@ -195,9 +193,9 @@ def stream_spec(
     streams as detected by libavformat except when a program ID is also
     specified. In this case it is based on the ordering of the streams in the
     program., defaults to None
-    :param media_type: One of following: ’v’ or ’V’ for video, ’a’ for audio, ’s’ for
-    subtitle, ’d’ for data, and ’t’ for attachments. ’v’ matches all video
-    streams, ’V’ only matches video streams which are not attached pictures,
+    :param media_type: One of following: 'v' or 'V' for video, 'a' for audio, 's' for
+    subtitle, 'd' for data, and 't' for attachments. 'v' matches all video
+    streams, 'V' only matches video streams which are not attached pictures,
     video thumbnails or cover arts. If additional stream specifier is used, then
     it matches streams which both have this type and match the additional stream
     specifier. Otherwise, it matches all streams of the specified type, defaults
@@ -362,22 +360,22 @@ def map_option(
 
     is_linklabel = input_file_id is None
 
-    if (linklabel is None)==is_linklabel:
-        raise ValueError('Either linklabel or input_file_id must be non-None')
-    
+    if (linklabel is None) == is_linklabel:
+        raise ValueError("Either linklabel or input_file_id must be non-None")
+
     if is_linklabel:
         return linklabel
-    
+
     map = str(input_file_id)
     if stream_specifier:
         if isinstance(stream_specifier, dict):
             stream_specifier = stream_spec(**stream_specifier)
         map = f"{map}:{stream_specifier}"
     if negative:
-        map = f'-{map}'
+        map = f"-{map}"
     if view_specifier:
-        map = f'{map}:{view_specifier}'
+        map = f"{map}:{view_specifier}"
     if optional:
-        map = f'{map}?'
+        map = f"{map}?"
 
     return map
