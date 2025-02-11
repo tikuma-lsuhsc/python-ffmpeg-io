@@ -32,8 +32,9 @@ ProgressCallable = Callable[[dict[str, Any], bool], bool]
     The callback may return True to cancel the FFmpeg execution.
 """
 
-
 MediaType = Literal["audio", "video"]
+
+FFmpegMediaType = Literal["video", "audio", "subtitle", "data", "attachments"]
 
 FFmpegUrlType = Union[str, Path, ParseResult]
 
