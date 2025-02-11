@@ -7,19 +7,19 @@ import pytest
     [
         (1, {"index": 1}),
         ("1", {"index": 1}),
-        ("v", {"media_type": "v"}),
+        ("v", {"stream_type": "v"}),
         ("p:1", {"program_id": 1}),
-        ("p:1:V", {"program_id": 1, "media_type": "V"}),
+        ("p:1:V", {"program_id": 1, "stream_type": "V"}),
         (
             "p:1:a:#6",
             {
                 "program_id": 1,
-                "media_type": "a",
+                "stream_type": "a",
                 "stream_id": 6,
             },
         ),
-        ("d:i:6", {"media_type": "d", "stream_id": 6}),
-        ("t:m:key", {"media_type": "t", "tag": "key"}),
+        ("d:i:6", {"stream_type": "d", "stream_id": 6}),
+        ("t:m:key", {"stream_type": "t", "tag": "key"}),
         ("m:key:value", {"tag": ("key", "value")}),
         ("u", {"usable": True}),
     ],
@@ -31,10 +31,10 @@ def test_parse_stream_spec(arg, ret):
 def test_stream_spec():
     assert utils.stream_spec() == ""
     assert utils.stream_spec(0) == "0"
-    assert utils.stream_spec(media_type="a") == "a"
-    assert utils.stream_spec(1, media_type="v") == "v:1"
+    assert utils.stream_spec(stream_type="a") == "a"
+    assert utils.stream_spec(1, stream_type="v") == "v:1"
     assert utils.stream_spec(program_id=1) == "p:1"
-    assert utils.stream_spec(1, media_type="v", program_id=1) == "v:p:1:1"
+    assert utils.stream_spec(1, stream_type="v", program_id=1) == "v:p:1:1"
     assert utils.stream_spec(stream_id=342) == "#342"
     assert utils.stream_spec(tag="creation_time") == "m:creation_time"
     assert (

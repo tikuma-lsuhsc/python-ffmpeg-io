@@ -10,16 +10,16 @@ from ._typing import get_args, Literal, TypedDict, Union, Tuple, MediaType, NotR
 
 import re
 
-StreamSpecDictMediaType = Literal["v", "a", "s", "d", "t", "V"]
+StreamSpecStreamType = Literal["v", "a", "s", "d", "t", "V"]
 # libavformat/avformat.c:match_stream_specifier()
 
 
 class StreamSpecDict_Options(TypedDict):
-    media_type: NotRequired[StreamSpecDictMediaType]  # py3.11 NotRequired[MediaType]
-    program_id: NotRequired[int]  # py3.11 NotRequired[int]
-    group_index: NotRequired[int]  # py3.11 NotRequired[int]
-    group_id: NotRequired[int]  # py3.11 NotRequired[int]
-    stream_id: NotRequired[int]  # py3.11 NotRequired[int]
+    stream_type: NotRequired[StreamSpecStreamType]
+    program_id: NotRequired[int]
+    group_index: NotRequired[int]
+    group_id: NotRequired[int]
+    stream_id: NotRequired[int]
 
 
 class StreamSpecDict_Index(StreamSpecDict_Options):
@@ -105,8 +105,8 @@ def parse_stream_spec(spec: str | int) -> StreamSpecDict:
         while i < nspecs:
             spec = spec_parts[i]
             # optional specifiers first
-            if spec in get_args(StreamSpecDictMediaType):
-                out["media_type"] = spec
+            if spec in get_args(StreamSpecStreamType):
+                out["stream_type"] = spec
                 i += 1
             elif spec == "g":
                 i += 1
@@ -175,7 +175,7 @@ def is_stream_spec(spec: str | int) -> bool:
 
 def stream_spec(
     index: int | None = None,
-    media_type: MediaType | None = None,
+    stream_type: StreamSpecStreamType | None = None,
     group_index: int | None = None,
     group_id: int | None = None,
     program_id: int | None = None,
@@ -193,7 +193,7 @@ def stream_spec(
     streams as detected by libavformat except when a program ID is also
     specified. In this case it is based on the ordering of the streams in the
     program., defaults to None
-    :param media_type: One of following: 'v' or 'V' for video, 'a' for audio, 's' for
+    :param stream_type: One of following: 'v' or 'V' for video, 'a' for audio, 's' for
     subtitle, 'd' for data, and 't' for attachments. 'v' matches all video
     streams, 'V' only matches video streams which are not attached pictures,
     video thumbnails or cover arts. If additional stream specifier is used, then
@@ -235,10 +235,10 @@ def stream_spec(
 
     spec = []
 
-    if media_type is not None:
-        if media_type not in get_args(StreamSpecDictMediaType):
-            raise ValueError(f"Unknown {media_type=}.")
-        spec.append(media_type)
+    if stream_type is not None:
+        if stream_type not in get_args(StreamSpecStreamType):
+            raise ValueError(f"Unknown {stream_type=}.")
+        spec.append(stream_type)
 
     if group_index is not None:
         spec.append(f"g:{group_index}")
