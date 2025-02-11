@@ -276,7 +276,7 @@ def parse_map_option(map: str, *, input_file_id: int | None = None) -> MapOption
     :return: dict containing the parsed parts of the option value, possibly containing the items:
         - negative: bool
         - input_file_id: int
-        - stream_specifier: str|StreamSpecDictDict
+        - stream_specifier: str
         - view_specifier: str
         - optional: bool
         - linklabel: str
@@ -319,11 +319,11 @@ def parse_map_option(map: str, *, input_file_id: int | None = None) -> MapOption
 
 
 def is_map_option(spec: str, allow_missing_file_id: bool = False) -> bool:
-    """True if valid stream specifier string
+    """True if valid map option string
 
-    :param spec: map specifier string to be tested
+    :param spec: map option string to be tested
     :param allow_missing_file_id: True to allow missing input file id
-    :return: True if valid stream specifier
+    :return: True if valid map option. The validity of stream_specifier is also tested.
     """
 
     try:
