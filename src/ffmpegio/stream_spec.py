@@ -184,7 +184,7 @@ def stream_spec(
     stream_id: int | None = None,
     tag: str | tuple[str, str] | None = None,
     usable: bool | None = None,
-    file_index: int | None = None,
+    *,
     no_join: bool = False,
 ) -> str:
     """Get stream specifier string
@@ -218,7 +218,6 @@ def stream_spec(
     :param usable: streams with usable configuration, the codec must be defined
     and the essential information such as video dimension or audio sample rate
     must be present, defaults to None
-    :param file_index: file index to be prepended if specified, defaults to None
     :param filter_output: True to append "out" to stream type, defaults to False
     :param no_join: True to return list of stream specifier elements, defaults to False
     :return: stream specifier string or empty string if all arguments are None
@@ -236,7 +235,7 @@ def stream_spec(
     if sum(v is not None for v in (group_index, group_id)) > 1:
         raise ValueError('Only one of "group_index" or "group_id" may be specified.')
 
-    spec = [] if file_index is None else [str(file_index)]
+    spec = []
 
     if media_type is not None:
         if media_type not in get_args(StreamSpecDictMediaType):
