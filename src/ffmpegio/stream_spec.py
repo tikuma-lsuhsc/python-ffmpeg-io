@@ -6,7 +6,15 @@ parse & compose FFmpeg stream spec string from/to StreamSpec object
 
 from __future__ import annotations
 
-from ._typing import get_args, Literal, TypedDict, Union, Tuple, MediaType, NotRequired
+from ._typing import (
+    get_args,
+    Literal,
+    TypedDict,
+    Union,
+    Tuple,
+    FFmpegMediaType,
+    NotRequired,
+)
 
 import re
 
@@ -59,6 +67,38 @@ MapOptionDict = Union[InputMapOptionDict, GraphMapOptionDict]
 """Parsed dict of FFmpeg -map option string"""
 
 #################################
+
+
+def stream_type_to_media_type(s: StreamSpecStreamType | None) -> FFmpegMediaType | None:
+    """get media type string from stream type specifier
+
+    :param s: stream type character or `None`
+    :return: media type string or `None` if input is `None`
+
+    ## Stream-to-Media Type Conversion Table
+
+    | stream |     media      |
+    |:-------|:---------------|
+    | `'v'`  | `'video'`      |
+    | `'V'`  | `'video'`      |
+    | `'a'`  | `'audio'`      |
+    | `'s'`  | `'subtitle'`   |
+    | `'d'`  | `'data'`       |
+    | `'t'`  | `'attachments'`|
+
+    """
+
+    if s is None:
+        return s
+
+    return {
+        "v": "video",
+        "a": "audio",
+        "s": "subtitle",
+        "d": "data",
+        "t": "attachements",
+        "V": "video",
+    }[s]
 
 
 def parse_stream_spec(spec: str | int) -> StreamSpecDict:
