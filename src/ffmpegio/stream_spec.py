@@ -335,3 +335,45 @@ def is_map_option(spec: str, allow_missing_file_id: bool = False) -> bool:
     except Exception:
         return False
     return True
+
+
+def map_option(
+    input_file_id: int | None = None,
+    linklabel: str | None = None,
+    stream_specifier: str | StreamSpecDict | None = None,
+    negative: bool | None = None,
+    view_specifier: str | None = None,
+    optional: bool | None = None,  # True if optional mapping
+) -> str:
+    """compose map option str
+
+    :param input_file_id: index of the source index, defaults to None
+    :param stream_specifier: stream specifier, defaults to None
+    :param negative: True to disables matching streams from already created mappings, defaults to None
+    :param view_specifier: view specifier, defaults to None
+    :param optional: True if optional mapping, defaults to None
+    :param linklabel: output label of a filtergraph
+    :return: map option string
+
+    Either input_file_id or linklabel must be non-`None`.
+    """
+
+    is_linklabel = input_file_id is None
+
+    if (linklabel is None)==is_linklabel:
+        raise ValueError('Either linklabel or input_file_id must be non-None')
+    
+    if is_linklabel:
+        return linklabel
+    
+    map = str(input_file_id)
+    if stream_specifier:
+        map = f'{map}:{stream_specifier}'
+    if negative:
+        map = f'-{map}'
+    if view_specifier:
+        map = f'{map}:{view_specifier}'
+    if optional:
+        map = f'{map}?'
+
+    return map
