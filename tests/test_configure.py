@@ -220,3 +220,13 @@ def test_auto_map(inputs, input_info, filters_complex, ret):
         args["global_options"] = {"filter_complex": filters_complex}
     out = configure.auto_map(args, input_info)
     assert out == ret
+
+
+@pytest.mark.parametrize(
+    ("filters_complex", "ret"),
+    [(["split=n=2"], {"[out0]": "video", "[out1]": "video"})],
+)
+def test_analyze_fg_outputs(filters_complex, ret):
+    args = configure.empty({"filter_complex": filters_complex})
+    out = configure.analyze_fg_outputs(args)
+    assert out == ret

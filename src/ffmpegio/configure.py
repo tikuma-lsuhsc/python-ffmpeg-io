@@ -907,83 +907,11 @@ def auto_map(
     of all the output pads of the complex filtergraphs'. Otherwise, all the audio and video
     streams of the input urls are mapped.
 
-    Possible Complex Filtergraph Modification
-    -----------------------------------------
-
-    To enable auto-mapping, all the output pads must be labeled. Thus, if the complex filtergraphs
-    in the `filter_complex` global option have any unlabeled output, they are automatically
-    labeled as `outN` where N is a number starting from `0`. If a label has alraedy been assigned
-    to another output pad, that label will be skipped.
-
     """
 
     gopts = args.get("global_options", None) or {}
-    map = {}
     if "filter_complex" in gopts:
-
-        # make sure it's a list of filtergraphs
-        filters_complex = utils.as_multi_option(
-            gopts["filter_complex"],
-            (
-                str,
-                FilterGraphObject,
-            ),
-        )
-
-        # make sure all are FilterGraphObjects
-        filters_complex = [fgb.as_filtergraph_object(fg) for fg in filters_complex]
-
-        # check for unlabeled outputs and log existing output labels
-        out_indices = set()
-        out_labels = {}
-        out_unlabeled = False
-        for fg in filters_complex:
-            for idx, filter, _ in fg.iter_output_pads(full_pad_index=True):
-                label = fg.get_label(outpad=idx)
-                if label is None:
-                    out_unlabeled = True
-                elif m := re.match(r"out(\d+)$", label):
-                    out_indices.add(int(m[1]))
-                    out_labels[label] = (filter, idx)
-
-        # remove all the output pads connected to an input pad of another filtergraph
-        if len(filters_complex) > 1:
-            for fg in filters_complex:
-                for label, _ in fg.iter_input_labels():
-                    if label in out_labels:
-                        out_labels.pop(label)
-
-        # if there are unlabeled outputs, label them all
-        if out_unlabeled:
-            out_n = next(i for i in range(len(out_labels) + 1) if i not in out_labels)
-            for i, fg in enumerate(filters_complex):
-                new_labels = []
-                for idx, filter, _ in fg.iter_output_pads(
-                    unlabeled_only=True, full_pad_index=True
-                ):
-                    label = f"out{out_n}"
-                    out_labels[label] = (filter, idx)
-                    new_labels.append({"label": label, "outpad": idx})
-
-                    # next index
-                    while True:
-                        out_n += 1
-                        if out_n not in out_labels:
-                            break
-
-                for kwargs in new_labels:
-                    fg = fg.add_label(**kwargs)
-                filters_complex[i] = fg
-
-        # create the output map
-        map = {
-            f"[{label}]": filter.get_pad_media_type("output", pad_id)
-            for label, (filter, pad_id) in out_labels.items()
-        }
-
-        # update the filtergraphs
-        args["global_options"]["filter_complex"] = filters_complex
-
+        map = analyze_fg_outputs(args)
     else:
         # if no filtergraph, get all video & audio streams from all the input urls
         map = {
@@ -991,6 +919,89 @@ def auto_map(
             for i, ((url, opts), info) in enumerate(zip(args["inputs"], input_info))
             for j, media_type in retrieve_input_stream_ids(info, url, opts or {})
         }
+
+    return map
+
+
+def analyze_fg_outputs(args: FFmpegArgs) -> dict[str, MediaType | None]:
+    """list all available output labels of the complex filtergraphs
+
+    :param args: FFmpeg argument dict. `filter_complex` argument may be modified if present.
+    :return: a map of filtergraph output labels to their media types
+
+    Possible Complex Filtergraph Modification
+    -----------------------------------------
+
+    To enable auto-mapping, all the output pads must be labeled. Thus, if the complex filtergraphs
+    in the `filter_complex` global option have any unlabeled output, they are automatically
+    labeled as `outN` where N is a number starting from `0`. If a label has alraedy been assigned
+    to another output pad, that label will be skipped.
+    """
+
+    gopts = args.get("global_options", None) or {}
+
+    if "filter_complex" not in gopts:
+        # no filtergraph
+        return None
+
+    # make sure it's a list of filtergraphs
+    filters_complex = utils.as_multi_option(
+        gopts["filter_complex"], (str, FilterGraphObject)
+    )
+
+    # make sure all are FilterGraphObjects
+    filters_complex = [fgb.as_filtergraph_object(fg) for fg in filters_complex]
+
+    # check for unlabeled outputs and log existing output labels
+    out_indices = set()
+    out_labels = {}
+    out_unlabeled = False
+    for fg in filters_complex:
+        for idx, filter, _ in fg.iter_output_pads(full_pad_index=True):
+            label = fg.get_label(outpad=idx)
+            if label is None:
+                out_unlabeled = True
+            elif m := re.match(r"out(\d+)$", label):
+                out_indices.add(int(m[1]))
+                out_labels[label] = (filter, idx)
+
+    # remove all the output pads connected to an input pad of another filtergraph
+    if len(filters_complex) > 1:
+        for fg in filters_complex:
+            for label, _ in fg.iter_input_labels():
+                if label in out_labels:
+                    out_labels.pop(label)
+
+    # if there are unlabeled outputs, label them all
+    if out_unlabeled:
+        out_n = next(i for i in range(len(out_labels) + 1) if i not in out_labels)
+        for i, fg in enumerate(filters_complex):
+            new_labels = []
+            for idx, filter, _ in fg.iter_output_pads(
+                unlabeled_only=True, full_pad_index=True
+            ):
+                label = f"out{out_n}"
+                out_labels[label] = (filter, idx)
+                new_labels.append({"label": label, "outpad": idx})
+
+                # next index
+                while True:
+                    out_n += 1
+                    if out_n not in out_labels:
+                        break
+
+            for kwargs in new_labels:
+                fg = fg.add_label(**kwargs)
+            filters_complex[i] = fg
+
+    # create the output map
+    map = {
+        f"[{label}]": filter.get_pad_media_type("output", pad_id)
+        for label, (filter, pad_id) in out_labels.items()
+    }
+
+    # update the filtergraphs
+    args["global_options"]["filter_complex"] = filters_complex
 
     return map
 
