@@ -266,13 +266,15 @@ def stream_spec(
 #################################
 
 
-def parse_map_option(map: str, *, input_file_id: int | None = None) -> MapOptionDict:
+def parse_map_option(
+    map: str, *, input_file_id: int | None = None, parse_stream: bool = False
+) -> MapOptionDict:
     """parse the FFmpeg -map option str
 
     :param map: option string value
     :param input_file_id: if specified, auto-insert this id if a file id is missing in the given value,
                           defaults to None to error out if missing.
-    :param parse_stream_spec: True to also parse stream spec (if given)
+    :param parse_stream: True to also parse stream spec (if given)
     :return: dict containing the parsed parts of the option value, possibly containing the items:
         - negative: bool
         - input_file_id: int
@@ -315,6 +317,9 @@ def parse_map_option(map: str, *, input_file_id: int | None = None) -> MapOption
     if m[4]:
         out["optional"] = True
 
+    if parse_stream and "stream_specifier" in out:
+        out["stream_specifier"] = parse_stream_spec(out["stream_specifier"])
+
     return out
 
 
@@ -327,11 +332,9 @@ def is_map_option(spec: str, allow_missing_file_id: bool = False) -> bool:
     """
 
     try:
-        mspec = parse_map_option(
-            spec, input_file_id=0 if allow_missing_file_id else None
+        parse_map_option(
+            spec, input_file_id=0 if allow_missing_file_id else None, parse_stream=True
         )
-        if "stream_specifier" in mspec:
-            parse_stream_spec(mspec["stream_specifier"])
     except Exception:
         return False
     return True
