@@ -1080,8 +1080,8 @@ def process_url_inputs(
         else:
             try:
                 buffer = memoryview(url)
-            except:
-                raise ValueError("Given input URL argument is not supported.")
+            except TypeError as e:
+                raise TypeError("Given input URL argument is not supported.") from e
             else:
                 input_info = {"src_type": "buffer", "buffer": buffer}
                 url = None
