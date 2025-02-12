@@ -1250,8 +1250,8 @@ def retrieve_input_stream_ids(
         # if failed, return empty
         logger.warning("ffprobe failed.")
         stream_ids = []
-
-    if src_type == "fileobj":
-        # restore the read cursor position
-        f.seek(pos)
+    finally:
+        if src_type == "fileobj":
+            # restore the read cursor position
+            f.seek(pos)
     return stream_ids
