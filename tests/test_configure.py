@@ -197,19 +197,37 @@ def test_process_url_inputs(url, opts, defopts, ret):
             [(mul_url, None)],
             [{"src_type": "url"}],
             None,
-            {f"0:{i}": mtype for i, mtype in mul_streams},
+            {
+                f"0:{i}": {
+                    "media_type": mtype,
+                    "input_file_id": 0,
+                    "input_stream_id": i,
+                }
+                for i, mtype in mul_streams
+            },
         ),
         (
             [(vid_url, None), (aud_url, {})],
             [{"src_type": "url"}, {"src_type": "url"}],
             None,
-            {"0:0": "video", "1:0": "audio"},
+            {
+                "0:0": {
+                    "media_type": "video",
+                    "input_file_id": 0,
+                    "input_stream_id": 0,
+                },
+                "1:0": {
+                    "media_type": "audio",
+                    "input_file_id": 1,
+                    "input_stream_id": 0,
+                },
+            },
         ),
         (
             [(mul_url, None)],
             [{"src_type": "url"}],
             ["split=n=2"],
-            {"[out0]": "video", "[out1]": "video"},
+            {"[out0]": {"media_type": "video"}, "[out1]": {"media_type": "video"}},
         ),
     ],
 )
@@ -219,7 +237,10 @@ def test_auto_map(inputs, input_info, filters_complex, ret):
     if filters_complex is not None:
         args["global_options"] = {"filter_complex": filters_complex}
     out = configure.auto_map(args, input_info)
-    assert out == ret
+    assert out == {
+        spec: {"dst_type": "pipe", "user_map": None, **info}
+        for spec, info in ret.items()
+    }
 
 
 @pytest.mark.parametrize(

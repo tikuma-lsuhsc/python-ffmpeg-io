@@ -21,7 +21,9 @@ import re, logging
 logger = logging.getLogger("ffmpegio")
 
 from io import IOBase
-from . import utils
+
+from namedpipe import NPopen
+
 from . import filtergraph as fgb
 from .filtergraph.abc import FilterGraphObject
 from .utils.concat import FFConcat  # for typing
@@ -58,6 +60,15 @@ class InputSourceDict(TypedDict):
     buffer: NotRequired[bytes]  # index of the source index
     fileobj: NotRequired[IO]  # file object
     pipe: NotRequired[NPopen]  # pipe
+
+
+class RawOutputInfoDict(TypedDict):
+    dst_type: FFmpegOutputType  # True if file path/url
+    user_map: str | None  # user specified map option
+    media_type: MediaType | None  #
+    input_file_id: NotRequired[int | None]
+    input_stream_id: NotRequired[int | None]
+    pipe: NotRequired[NPopen]
 
 
 #################################
@@ -893,13 +904,13 @@ def add_filtergraph(
 
 
 def auto_map(
-    args: FFmpegArgs, input_info: Sequence[InputSourceDict]
-) -> dict[str, MediaType | None]:
+    args: FFmpegArgs, input_info: list[InputSourceDict]
+) -> dict[str, RawOutputInfoDict]:
     """list all available streams from all FFmpeg input sources
 
     :param args: FFmpeg argument dict. `filter_complex` argument may be modified.
     :param input_info: a list of input data source information
-    :return: a map of input/filtergraph output labels to their media types.
+    :return: a map of input/filtergraph output labels and their stream information.
 
     Mapping Input Streams vs. Complex Filtergraph Outputs
     -----------------------------------------------------
@@ -912,16 +923,23 @@ def auto_map(
 
     gopts = args.get("global_options", None) or {}
     if "filter_complex" in gopts:
-        map = analyze_fg_outputs(args)
-    else:
-        # if no filtergraph, get all video & audio streams from all the input urls
-        map = {
-            f"{i}:{j}": media_type
-            for i, ((url, opts), info) in enumerate(zip(args["inputs"], input_info))
-            for j, media_type in retrieve_input_stream_ids(info, url, opts or {})
+        return {
+            linklabel: {"dst_type": "pipe", "user_map": None, "media_type": media_type}
+            for linklabel, media_type in analyze_fg_outputs(args).items()
         }
 
-    return map
+    # if no filtergraph, get all video & audio streams from all the input urls
+    return {
+        f"{i}:{j}": {
+            "dst_type": "pipe",
+            "user_map": None,
+            "media_type": media_type,
+            "input_file_id": i,
+            "input_stream_id": j,
+        }
+        for i, ((url, opts), info) in enumerate(zip(args["inputs"], input_info))
+        for j, media_type in retrieve_input_stream_ids(info, url, opts or {})
+    }
 
 
 def analyze_fg_outputs(args: FFmpegArgs) -> dict[str, MediaType | None]:
