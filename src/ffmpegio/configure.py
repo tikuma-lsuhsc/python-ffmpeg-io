@@ -1006,61 +1006,73 @@ def analyze_fg_outputs(args: FFmpegArgs) -> dict[str, MediaType | None]:
     return map
 
 
-def analyze_input_url_arg(
-    url_opts: FFmpegInputUrlComposite | tuple[FFmpegInputUrlComposite, dict],
+def process_url_inputs(
+    args: FFmpegArgs,
+    urls: list[FFmpegInputUrlComposite | tuple[FFmpegInputUrlComposite, dict]],
     inopts_default: dict[str, Any],
-) -> tuple[tuple[FFmpegUrlType | FilterGraphObject | None, dict], InputSourceDict]:
+) -> list[InputSourceDict]:
     """analyze and process heterogeneous input url argument
 
-    :param url: composite input url argument
+    :param args: FFmpeg argument dict, `args['inputs']` receives all the new inputs.
+                 If input is a buffer, a fileobj, or an FFconcat, the first element 
+                 of the FFmpeg inputs entry is set to 'None', to be replaced by
+                 a pipe expression.
+    :param urls: list of input urls/data or a pair of input url and its options
     :param inopts_default: default input options
-    :return: tuple of an FFmpeg inputs entry and input source info. If input is not a url,
-             the first element of the FFmpeg inputs entry is None. An appropriate pipe url
-             must be set afterwards.
+    :return: list of input information
     """
 
-    # get the option dict
-    if utils.is_non_str_sequence(url_opts, (str, FilterGraphObject, Buffer)):
-        if len(url_opts) != 2:
-            raise ValueError("url-options pair input must be a tuple of the length 2.")
-        url, opts = url_opts
-        opts = inopts_default if opts is None else {**inopts_default, **opts}
-    else:
-        # only URL given
-        url, opts = url_opts, inopts_default
-
-    # check url (must be url and not fileobj)
-    is_fg = isinstance(url, FilterGraphObject)
-    if is_fg or ("lavfi" == opts.get("f", None) and isinstance(url, str)):
-        if is_fg:
-            if "f" not in opts:
-                opts["f"] = "lavfi"
-            elif opts["f"] != "lavfi":
+    input_info_list = [None] * len(urls)
+    for i, url in enumerate(urls):  # add inputs
+        # get the option dict
+        if utils.is_non_str_sequence(url, (str, FilterGraphObject, Buffer)):
+            if len(url) != 2:
                 raise ValueError(
-                    "input filtergraph must use the `'lavfi'` input format."
+                    "url-options pair input must be a tuple of the length 2."
                 )
-
-        input_info = {"src_type": "filtergraph"}
-
-    elif utils.is_fileobj(url, readable=True):
-        input_info = {"src_type": "fileobj", "fileobj": url}
-        url = None
-    elif utils.is_url(url, pipe_ok=False):
-        input_info = {"src_type": "url"}
-    elif isinstance(url, FFConcat):
-        # convert to buffer
-        input_info = {"src_type": "buffer", "buffer": FFConcat.input}
-        url = None
-    else:
-        try:
-            buffer = memoryview(url)
-        except:
-            raise ValueError("Given input URL argument is not supported.")
+            url, opts = url
+            opts = inopts_default if opts is None else {**inopts_default, **opts}
         else:
-            input_info = {"src_type": "buffer", "buffer": buffer}
-            url = None
+            # only URL given
+            url, opts = url, inopts_default
 
-    return (url, opts), input_info
+        # check url (must be url and not fileobj)
+        is_fg = isinstance(url, FilterGraphObject)
+        if is_fg or ("lavfi" == opts.get("f", None) and isinstance(url, str)):
+            if is_fg:
+                if "f" not in opts:
+                    opts["f"] = "lavfi"
+                elif opts["f"] != "lavfi":
+                    raise ValueError(
+                        "input filtergraph must use the `'lavfi'` input format."
+                    )
+
+            input_info = {"src_type": "filtergraph"}
+
+        elif utils.is_fileobj(url, readable=True):
+            input_info = {"src_type": "fileobj", "fileobj": url}
+            url = None
+        elif utils.is_url(url, pipe_ok=False):
+            input_info = {"src_type": "url"}
+        elif isinstance(url, FFConcat):
+            # convert to buffer
+            input_info = {"src_type": "buffer", "buffer": FFConcat.input}
+            url = None
+        else:
+            try:
+                buffer = memoryview(url)
+            except:
+                raise ValueError("Given input URL argument is not supported.")
+            else:
+                input_info = {"src_type": "buffer", "buffer": buffer}
+                url = None
+
+        url_opts, input_info_list[i] = (url, opts), input_info
+
+        # leave the URL None if data needs to be piped in
+        add_url(args, "input", *url_opts)
+
+    return input_info_list
 
 
 def retrieve_input_stream_ids(

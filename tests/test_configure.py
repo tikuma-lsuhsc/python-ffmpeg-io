@@ -168,7 +168,7 @@ def test_retrieve_input_stream_ids(info, url, opts, stream_spec, ret):
         ),
     ],
 )
-def test_analyze_input_url_arg(url, opts, defopts, ret):
+def test_process_url_inputs(url, opts, defopts, ret):
 
     info = ret[1]
     open_file = info["src_type"] in ("fileobj", "buffer")
@@ -179,10 +179,11 @@ def test_analyze_input_url_arg(url, opts, defopts, ret):
                 info["buffer"] = url = fileobj.read()
             else:
                 url = info["fileobj"] = fileobj
-        out = configure.analyze_input_url_arg(
-            url if opts is None else (url, opts), defopts
+        args = configure.empty()
+        out = configure.process_url_inputs(
+            args, [url if opts is None else (url, opts)], defopts
         )
-        assert out == ret
+        assert (args["inputs"][0], out[0]) == ret
 
     finally:
         if open_file:
