@@ -28,7 +28,11 @@ from . import filtergraph as fgb
 from .filtergraph.abc import FilterGraphObject
 from .utils.concat import FFConcat  # for typing
 from ._utils import as_multi_option, is_non_str_sequence
-from .stream_spec import stream_spec as compose_stream_spec, StreamSpecDict
+from .stream_spec import (
+    stream_spec as compose_stream_spec,
+    StreamSpecDict,
+    stream_type_to_media_type,
+)
 
 #################################
 ## module types
@@ -902,6 +906,98 @@ def add_filtergraph(
                 else [existing_map, *map]
             )
 
+
+
+def resolve_raw_output_streams(
+    args: FFmpegArgs, input_info: list[InputSourceDict], streams: Sequence[str]
+) -> dict[str:RawOutputInfoDict]:
+    """resolve the raw output streams from given sequence of map options
+
+    :param args: FFmpeg argument dict
+    :param input_info: FFmpeg inputs' additional information, its length must match that of `args['inputs']`
+    :param streams: a sequence of map options defining the streams
+    :return: output information keyed by a unique map option string
+    """
+
+    dst_type = "pipe"
+
+    # parse all mapping option values
+    input_file_id = 0 if len(input_info) == 1 else None
+    map_options = [
+        {"stream_specifier": {}, **opt}
+        for opt in (
+            utils.parse_map_option(spec, parse_stream=True, input_file_id=input_file_id)
+            for spec in streams
+        )
+    ]
+
+    # check if stream specifiers single out mapping one input stream per output
+    if all(
+        (opt["stream_specifier"].get("stream_type", None) or "") in "avV"
+        and "stream_id" in opt["stream_specifier"]
+        for opt in map_options
+    ):
+        # no need to run the stream mapping analysis
+        return {
+            spec: {
+                "dst_type": dst_type,
+                "user_map": spec,
+                "media_type": stream_type_to_media_type(
+                    opt["stream_specifier"].get("stream_type", None)
+                ),
+                "input_file_id": opt.get("input_file_id", None),
+                "input_stream_id": None,
+            }
+            for spec, opt in zip(streams, map_options)
+        }
+    else:
+        # resolve all the output streams
+
+        # if any linklabel given, analyze the filter_complex global option values
+        fg_map: dict[str, MediaType] = (
+            analyze_fg_outputs(args)
+            if any("linklabel" in opt for opt in map_options)
+            else {}
+        )
+
+        # given as an FFmpeg map option, convert to the dict format
+        inputs = args["inputs"]
+        stream_info = {}  # one stream per item, value: map spec & media_type
+        for spec, map_option in zip(streams, map_options):
+
+            # filtergraph output
+            media_type = fg_map.get(spec, None)
+
+            if media_type is None:
+                # input url
+                file_index = map_option["input_file_id"]
+                info = input_info[file_index]
+                stream_spec = map_option["stream_specifier"]
+                stream_data = retrieve_input_stream_ids(
+                    info, *inputs[file_index], stream_spec=stream_spec
+                )
+                unique_stream = len(stream_data) == 1
+                for stream_index, media_type in stream_data:
+                    stream_info[
+                        (spec if unique_stream else f"{file_index}:{stream_index}")
+                    ] = {
+                        "dst_type": dst_type,
+                        "user_map": spec,
+                        "media_type": media_type,
+                        "input_file_id": file_index,
+                        "input_stream_id": stream_index,
+                    }
+            else:
+                # filtergraph output
+                stream_info[spec] = {
+                    "dst_type": dst_type,
+                    "user_map": spec,
+                    "media_type": media_type,
+                    "input_file_id": None,
+                    "input_stream_id": None,
+                }
+
+        return stream_info
 
 
 def auto_map(

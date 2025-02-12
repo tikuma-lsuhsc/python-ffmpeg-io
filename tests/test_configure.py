@@ -1,4 +1,5 @@
 import pytest
+from pprint import pprint
 
 from ffmpegio import configure
 
@@ -251,3 +252,38 @@ def test_analyze_fg_outputs(filters_complex, ret):
     args = configure.empty({"filter_complex": filters_complex})
     out = configure.analyze_fg_outputs(args)
     assert out == ret
+
+
+# prepare input
+@pytest.fixture(scope="module")
+def ffmpeg_url_inputs_mul():
+    args = configure.empty()
+    info = configure.process_url_inputs(args, [mul_url], {})
+    yield args, info
+
+
+@pytest.fixture(scope="module")
+def ffmpeg_url_inputs_vid_aud():
+    args = configure.empty()
+    info = configure.process_url_inputs(args, [vid_url, aud_url], {})
+    yield args, info
+
+
+@pytest.mark.parametrize(
+    ("ffmpeg_url_inputs", "filters_complex", "streams"),
+    [
+        ("ffmpeg_url_inputs_mul", None, ["v"]),
+        ("ffmpeg_url_inputs_vid_aud", None, ["0:v:0", "1:a:0"]),
+        ("ffmpeg_url_inputs_mul", ["split=n=2"], ["[out0]", "[out1]", "a:0"]),
+    ],
+)
+def test_resolve_raw_output_streams(
+    ffmpeg_url_inputs, filters_complex, streams, request
+):
+
+    args, input_info = request.getfixturevalue(ffmpeg_url_inputs)
+
+    if filters_complex is not None:
+        args["global_options"] = {"filter_complex": filters_complex}
+    out = configure.resolve_raw_output_streams(args, input_info, streams)
+    pprint(out)
