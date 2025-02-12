@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ._typing import (
     Literal,
+    get_args,
     Any,
     MediaType,
     FFmpegUrlType,
@@ -1124,6 +1125,7 @@ def retrieve_input_stream_ids(
                 sp_kwargs=sp_kwargs,
                 stream_spec=stream_spec,
             )
+            if info["codec_type"] in get_args(MediaType)
         ]
     except:
         # if failed, return empty
