@@ -943,7 +943,7 @@ def analyze_fg_outputs(args: FFmpegArgs) -> dict[str, MediaType | None]:
 
     if "filter_complex" not in gopts:
         # no filtergraph
-        return None
+        return {}
 
     # make sure it's a list of filtergraphs
     filters_complex = utils.as_multi_option(
