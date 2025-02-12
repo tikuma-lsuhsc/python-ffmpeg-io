@@ -12,7 +12,7 @@ from ._typing import (
     IO,
     Buffer,
 )
-from collections.abc import Sequence
+from collections.abc import Sequence, Callable
 
 from fractions import Fraction
 
@@ -1214,21 +1214,11 @@ def retrieve_input_stream_ids(
         return utils.analyze_input_filtergraph_ids(url)
 
     # file/network input - process only if seekable
-    sp_kwargs = {}  # ffprobe subprocess keywords
-    if src_type != "url":
-        url = "pipe:0"
-        if src_type == "buffer":
-            sp_kwargs["input"] = info["buffer"]
-        elif src_type == "fileobj":
-            f = info["fileobj"]
-            if not (f.readable() and f.seekable()):
-                logger.warning("file object must be seekable.")
-                return []
-            pos = f.tell()
-            sp_kwargs["stdin"] = f
-        else:
-            logger.warning("unknown input source type.")
-            return []
+    # get ffprobe subprocess keywords
+    url, sp_kwargs, exit_fcn = set_sp_kwargs_stdin(url, info)
+    if sp_kwargs is None:
+        # something failed (warning logged)
+        return []
 
     # get the stream list if ffprobe can
     try:
@@ -1251,7 +1241,42 @@ def retrieve_input_stream_ids(
         logger.warning("ffprobe failed.")
         stream_ids = []
     finally:
-        if src_type == "fileobj":
-            # restore the read cursor position
-            f.seek(pos)
+        # clean-up
+        exit_fcn()
     return stream_ids
+
+
+
+def set_sp_kwargs_stdin(
+    url: str | None, info: InputSourceDict, sp_kwargs: dict = {}
+) -> tuple[str, dict | None, Callable]:
+    """configure sp_kwargs for ffprobe/ffmpeg call to pipe-in the data via stdin
+
+    :param url: input URL
+    :param info: input info
+    :param sp_kwargs: initial sp_kwargs keyword options
+    :return: tuple of url (or "pipe:0" if stdin data), updated sp_kwargs, and cleanup function
+    """
+
+    # ffprobe subprocess keywords
+    src_type = info["src_type"]
+    exit_fcn = lambda: None
+
+    if src_type != "url":
+        url = "pipe:0"
+        if src_type == "buffer":
+            sp_kwargs = {**sp_kwargs, "input": info["buffer"]}
+        elif src_type == "fileobj":
+            f = info["fileobj"]
+            if f.readable() and f.seekable():
+                sp_kwargs = {**sp_kwargs, "stdin": f}
+                pos = f.tell()
+                exit_fcn = lambda: f.seek(pos)  # restore the read cursor position
+            else:
+                logger.warning("file object must be seekable.")
+                sp_kwargs = None
+        else:
+            logger.warning("unknown input source type.")
+            sp_kwargs = None
+
+    return url, sp_kwargs, exit_fcn
