@@ -28,6 +28,7 @@ from . import filtergraph as fgb
 from .filtergraph.abc import FilterGraphObject
 from .utils.concat import FFConcat  # for typing
 from ._utils import as_multi_option, is_non_str_sequence
+from .stream_spec import stream_spec as compose_stream_spec, StreamSpecDict
 
 #################################
 ## module types
@@ -1098,7 +1099,7 @@ def retrieve_input_stream_ids(
     info: InputSourceDict,
     url: FFmpegUrlType | FilterGraphObject | None,
     opts: dict,
-    stream_spec: str | None = None,
+    stream_spec: str | StreamSpecDict | None = None,
 ) -> list[tuple[int, MediaType]]:
     """Retrieve ids and media types of streams in an input source
 
@@ -1141,7 +1142,11 @@ def retrieve_input_stream_ids(
                 url,
                 f=opts.get("f", None),
                 sp_kwargs=sp_kwargs,
-                stream_spec=stream_spec,
+                stream_spec=(
+                    compose_stream_spec(**stream_spec)
+                    if isinstance(stream_spec, dict)
+                    else stream_spec
+                ),
             )
             if info["codec_type"] in get_args(MediaType)
         ]
