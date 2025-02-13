@@ -11,6 +11,7 @@ from ._typing import (
     TypedDict,
     IO,
     Buffer,
+    InputSourceDict,
 )
 from collections.abc import Sequence, Callable
 
@@ -38,7 +39,7 @@ from .stream_spec import (
 ## module types
 
 UrlType = Literal["input", "output"]
-FFmpegInputType = Literal["url", "filtergraph", "buffer", "fileobj"]
+
 FFmpegOutputType = Literal["url", "fileobj"]
 
 FFmpegInputUrlComposite = Union[FFmpegUrlType, FFConcat, FilterGraphObject, IO, Buffer]
@@ -56,15 +57,6 @@ class FFmpegArgs(TypedDict):
     outputs: list[FFmpegOutputOptionTuple]
     # list of output definitions (pairs of url and options)
     global_options: NotRequired[dict | None]  # FFmpeg global options
-
-
-class InputSourceDict(TypedDict):
-    """input source info"""
-
-    src_type: FFmpegInputType  # True if file path/url
-    buffer: NotRequired[bytes]  # index of the source index
-    fileobj: NotRequired[IO]  # file object
-    pipe: NotRequired[NPopen]  # pipe
 
 
 class RawOutputInfoDict(TypedDict):

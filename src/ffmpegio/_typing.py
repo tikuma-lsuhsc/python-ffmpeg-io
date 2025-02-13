@@ -38,3 +38,14 @@ FFmpegMediaType = Literal["video", "audio", "subtitle", "data", "attachments"]
 
 FFmpegUrlType = Union[str, Path, ParseResult]
 
+FFmpegInputType = Literal["url", "filtergraph", "buffer", "fileobj", "pipe"]
+
+
+class InputSourceDict(TypedDict):
+    """input source info"""
+
+    src_type: FFmpegInputType  # True if file path/url
+    buffer: NotRequired[bytes]  # index of the source index
+    fileobj: NotRequired[IO]  # file object
+    pipe: NotRequired[NPopen]  # pipe
+
