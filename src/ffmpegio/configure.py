@@ -56,7 +56,7 @@ class FFmpegArgs(TypedDict):
     # list of input definitions (pairs of url and options)
     outputs: list[FFmpegOutputOptionTuple]
     # list of output definitions (pairs of url and options)
-    global_options: NotRequired[dict | None]  # FFmpeg global options
+    global_options: dict  # FFmpeg global options
 
 
 class RawOutputInfoDict(TypedDict):
@@ -123,9 +123,9 @@ def empty(global_options: dict = None) -> FFmpegArgs:
     """create empty ffmpeg arg dict
 
     :param global_options: global options, defaults to None
-    :return: empty ffmpeg arg dict with 'inputs','outputs',and 'global_options' entries.
+    :return: ffmpeg arg dict with empty 'inputs','outputs',and 'global_options' entries.
     """
-    return {"inputs": [], "outputs": [], "global_options": global_options}
+    return {"inputs": [], "outputs": [], "global_options": global_options or {}}
 
 
 def check_url(
