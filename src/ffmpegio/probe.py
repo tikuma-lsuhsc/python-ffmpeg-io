@@ -10,6 +10,10 @@ import json, re
 from fractions import Fraction
 from functools import lru_cache
 
+import logging
+
+logger = logging.getLogger("ffmpegio")
+
 from .path import ffprobe, PIPE
 
 # fmt:off
@@ -239,6 +243,11 @@ def _run(
     **kwargs,
 ) -> dict[str, str]:
     """execute ffprobe, return stdout as dict, and cache its output"""
+
+    # TODO - enable caching
+    if cache_output:
+        logger.warning('caching of previous ffprobe outputs is disabled.')
+        cache_output = False
 
     entries = _compose_entries(entries)
     if sp_kwargs is not None:
