@@ -12,7 +12,7 @@ from .. import caps, plugins
 from .._utils import *
 from ..stream_spec import *
 from ..filtergraph.abc import FilterGraphObject
-from ..filtergraph import as_filtergraph_object
+from .. import filtergraph as fgb
 from ..errors import FFmpegError
 
 from ..typing import Any
@@ -518,7 +518,7 @@ def analyze_input_filtergraph_ids(
     """
 
     # parse if str expression is given
-    fg = as_filtergraph_object(fg)
+    fg = fgb.as_filtergraph_object(fg)
 
     outtypes = {}
     for idx, filter, _ in fg.iter_output_pads():
