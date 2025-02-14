@@ -1142,7 +1142,7 @@ def process_url_inputs(
             opts = inopts_default if opts is None else {**inopts_default, **opts}
         else:
             # only URL given
-            url, opts = url, inopts_default
+            opts = inopts_default
 
         # check url (must be url and not fileobj)
         is_fg = isinstance(url, FilterGraphObject)
