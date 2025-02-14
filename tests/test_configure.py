@@ -105,27 +105,6 @@ def test_get_option():
     assert configure.get_option(args, "output", "ac", file_id=1) == 2
 
 
-def test_video_basic_filter():
-    print(
-        configure._build_video_basic_filter(
-            fill_color=None,
-            remove_alpha=None,
-            crop=None,
-            flip=None,
-            transpose=None,
-        )
-    )
-    print(
-        configure._build_video_basic_filter(
-            fill_color="red",
-            remove_alpha=True,
-            # crop=(100, 100, 5, 10),
-            # flip="horizontal",
-            # transpose="clock",
-        )
-    )
-
-
 mul_streams = [(0, "video"), (1, "audio"), (2, "video"), (3, "audio")]
 mul_vid_streams = [mul_streams[0], mul_streams[2]]
 

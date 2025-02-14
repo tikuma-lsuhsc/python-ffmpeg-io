@@ -3,13 +3,84 @@
 
 from __future__ import annotations
 
-from .._typing import TYPE_CHECKING, Any
+from .._typing import TYPE_CHECKING, Any, Sequence, Literal
 from ..stream_spec import StreamSpecDict
+from .abc import FilterGraphObject
 
 from .. import filtergraph as fgb
 
 if TYPE_CHECKING:
     from .Graph import Graph
+
+
+def _build_video_basic_filter(
+    fill_color: str | None = None,
+    remove_alpha: bool = False,
+    scale: str | Sequence | None = None,
+    crop: str | Sequence | None = None,
+    flip: Literal["horizontal", "vertical", "both"] | None = None,
+    transpose: str | Sequence | None = None,
+    square_pixels: (
+        Literal["upscale", "downscale", "upscale_even", "downscale_even"] | None
+    ) = None,
+) -> FilterGraphObject:
+    bg_color = fill_color or "white"
+
+    vfilters = (
+        fgb.Graph(
+            f"color=c={bg_color}[l1];[l1][in]scale2ref[l2],[l2]overlay=shortest=1"
+        )
+        if remove_alpha
+        else fgb.Chain()
+    )
+
+    if square_pixels == "upscale":
+        vfilters += "scale='max(iw,ih*dar)':'max(iw/dar,ih)':eval=init,setsar=1/1"
+    elif square_pixels == "downscale":
+        vfilters += "scale='min(iw,ih*dar)':'min(iw/dar,ih)':eval=init,setsar=1/1"
+    elif square_pixels == "upscale_even":
+        vfilters += "scale='trunc(max(iw,ih*dar)/2)*2':'trunc(max(iw/dar,ih)/2)*2':eval=init,setsar=1/1"
+    elif square_pixels == "downscale_even":
+        vfilters += "scale='trunc(min(iw,ih*dar)/2)*2':'trunc(min(iw/dar,ih)/2)*2':eval=init,setsar=1/1"
+    elif square_pixels is not None:
+        raise ValueError(f"unknown `square_pixels` option value given: {square_pixels}")
+
+    if crop:
+        try:
+            assert not isinstance(crop, str)
+            vfilters += fgb.Filter("crop", *crop)
+        except:
+            vfilters += fgb.Filter("crop", crop)
+
+    if flip:
+        try:
+            ftype = ("", "horizontal", "vertical", "both").index(flip)
+        except:
+            raise Exception("Invalid flip filter specified.")
+        if ftype % 2:
+            vfilters += "hflip"
+        if ftype >= 2:
+            vfilters += "vflip"
+
+    if transpose is not None:
+        try:
+            assert not isinstance(transpose, str)
+            vfilters += fgb.Filter("transpose", *transpose)
+        except:
+            vfilters += fgb.Filter("transpose", transpose)
+
+    if scale:
+        try:
+            scale = [int(s) for s in scale.split("x")]
+        except:
+            pass
+        try:
+            assert not isinstance(scale, str)
+            vfilters += fgb.Filter("scale", *scale)
+        except:
+            vfilters += fgb.Filter("scale", scale)
+
+    return vfilters
 
 
 def merge_audio(
