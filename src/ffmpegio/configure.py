@@ -512,11 +512,9 @@ def finalize_audio_read_opts(
     outmap = outopts["map"]
     outmap_fields = parse_map_option(outmap)
 
-    # use the output option by default
+    # use the output options by default
     opt_vals = [outopts.get(o, None) for o in options]
-    all_found = all(opt_vals)
-
-    if not all_found:
+    if not all(opt_vals):
         if "linklabel" in outmap_fields:  # mapping filtergraph output
             # must be mapped a linklabel of a filter_complex global option
             logger.warning(
@@ -527,49 +525,38 @@ def finalize_audio_read_opts(
             # fg = fgb.stack(args["global_options"]["filter_complex"])
         else:
             ifile = outmap_fields["input_file_id"]
-            has_simple_filter = "af" in outopts or "filter:a" in outopts
-
-            # check the input option data
+            
+            # get input option values
             inurl, inopts = args["inputs"][ifile]
-            if not has_simple_filter:
-                opt_vals = [inopts.get(o, None) for o in options]
-                all_found = all(opt_vals)
+            inopt_vals = [inopts.get(o, None) for o in options]
 
-            if not all_found:
-                # get input options
-                inopt_vals = [inopts.get(o, None) for o in options]
+            # fill the still missing values directly from the input url
+            if not all(inopt_vals):
+                st_vals = utils.analyze_input_stream(
+                    fields, outmap, "audio", inurl, inopts, input_info[ifile]
+                )
+                inopt_vals = [v or s for v, s in zip(inopt_vals, st_vals)]
 
-                # directly from the input url
-                if not all(inopt_vals):
-                    st_vals = utils.analyze_input_stream(
-                        fields, outmap, "audio", inurl, inopts, input_info[ifile]
-                    )
-                    inopt_vals = [v or s for v, s in zip(inopt_vals, st_vals)]
+            # if a simple filter is present, use the stream specs of its output
+            if "af" in outopts or "filter:a" in outopts:
 
-                if has_simple_filter:
-                    # analyze the output of the simple filter
+                # create a source chain with matching specs and attach it to the af graph
+                ar, sample_fmt, ac = inopt_vals
+                af = (
+                    fgb.aevalsrc("|".join(["0"] * ac))
+                    + fgb.aformat(sample_fmts=sample_fmt or "dbl", r=ar)
+                    + outopts.get("filter:a", outopts.get("af", None))
+                )
+                inopt_vals = utils.analyze_input_stream(
+                    fields,
+                    "0",
+                    "audio",
+                    af,
+                    {"f": "lavfi"},
+                    {"src_type": "filtergraph"},
+                )
 
-                    # create a source chain with matching spec and attach it to the af graph
-                    ar, sample_fmt, ac = inopt_vals
-                    af = (
-                        fgb.aevalsrc("|".join(["0"] * ac))
-                        + fgb.aformat(sample_fmts=sample_fmt or "dbl", r=ar)
-                        + outopts.get("filter:a", outopts.get("af", None))
-                    )
-                    outpad = next(af.iter_output_pads(unlabeled_only=True), None)
-                    if outpad is not None:
-                        af = af >> "[out0]"
-                    inopt_vals = utils.analyze_input_stream(
-                        fields,
-                        "0",
-                        "audio",
-                        af,
-                        {"f": "lavfi"},
-                        {"src_type": "filtergraph"},
-                    )
-                    
-
-                opt_vals = [v or s for v, s in zip(opt_vals, inopt_vals)]
+            opt_vals = [v or s for v, s in zip(opt_vals, inopt_vals)]
 
     # assign the values to individual variables
     ar, sample_fmt, ac = opt_vals
