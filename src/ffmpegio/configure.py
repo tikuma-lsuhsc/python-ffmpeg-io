@@ -486,56 +486,117 @@ def build_basic_vf(args, remove_alpha=None, ofile=0):
 
 
 def finalize_audio_read_opts(
-    args: FFmpegArgs, ofile: int = 0, ifile: int = 0, istream: str | None = None
-) -> tuple[str, int, int]:
+    args: FFmpegArgs,
+    ofile: int = 0,
+    input_info: list[InputSourceDict] = [],
+) -> tuple[str, int | None, int | None]:
+    """finalize a raw output audio stream
 
-    inurl, inopts = args["inputs"][ifile]
-    if inopts is None:
-        inopts = {}
+    :param args: FFmpeg arguments. The option dict in args['outputs'][ofile][1] may be modified.
+    :param ofile: output file index, defaults to 0
+    :param input_info: list of input information, defaults to None
+
+    * Possible Output Options Modification
+      - "f" and "c:a" - raw audio format and codec will always be set
+      - "sample_fmt" - planar format to non-planar equivalent format or 'dbl' if format is unknown
+      -
+
+    * args['outputs'][ofile]['map'] is a valid mapping str (not a list of str)
+    * If complex filtergraph(s) is used, args['global_options']['filter_complex'] must be a list of fgb.Graph objects
+
+    """
+    options = ["ar", "sample_fmt", "ac"]
+    fields = ["sample_rate", "sample_fmt", "channels"]
+
     outopts = args["outputs"][ofile][1]
-    has_filter = has_filtergraph(args, "audio")
+    outmap = outopts["map"]
+    outmap_fields = parse_map_option(outmap)
 
-    sample_fmt_in = inopts.get("sample_fmt", None)
-    ac_in = inopts.get("ac", None)
-    ar_in = inopts.get("ar", None)
-    if isinstance(inurl, (str, Path)) and not (sample_fmt_in and ac_in and ar_in):
-        # TODO: handle lavfi input
-        try:
-            ar_in, sample_fmt_in, ac_in = (
-                x or y
-                for x, y in zip(
-                    (ar_in, sample_fmt_in, ac_in),
-                    probe._audio_info(inurl, istream, None),
-                )
+    # use the output option by default
+    opt_vals = [outopts.get(o, None) for o in options]
+    all_found = all(opt_vals)
+
+    if not all_found:
+        if "linklabel" in outmap_fields:  # mapping filtergraph output
+            # must be mapped a linklabel of a filter_complex global option
+            logger.warning(
+                "Pre-analysis of complex filtergraphs is not currently available."
             )
-        except:
-            pass
+            st_vals = [None, None, None]
+            # combine all the filtergraphs only for the analysis purpose
+            # fg = fgb.stack(args["global_options"]["filter_complex"])
+        else:
+            ifile = outmap_fields["input_file_id"]
+            has_simple_filter = "af" in outopts or "filter:a" in outopts
 
-    if outopts is None:
-        outopts = {}
-        args["outputs"][ofile] = (args["outputs"][ofile][0], outopts)
+            # check the input option data
+            inurl, inopts = args["inputs"][ifile]
+            if not has_simple_filter:
+                opt_vals = [inopts.get(o, None) for o in options]
+                all_found = all(opt_vals)
 
-    # pixel format must be specified
-    sample_fmt = outopts.get("sample_fmt", None)
+            if not all_found:
+                # get input options
+                inopt_vals = [inopts.get(o, None) for o in options]
+
+                # directly from the input url
+                if not all(inopt_vals):
+                    st_vals = utils.analyze_input_stream(
+                        fields, outmap, "audio", inurl, inopts, input_info[ifile]
+                    )
+                    inopt_vals = [v or s for v, s in zip(inopt_vals, st_vals)]
+
+                if has_simple_filter:
+                    # analyze the output of the simple filter
+
+                    # create a source chain with matching spec and attach it to the af graph
+                    ar, sample_fmt, ac = inopt_vals
+                    af = (
+                        fgb.aevalsrc("|".join(["0"] * ac))
+                        + fgb.aformat(sample_fmts=sample_fmt or "dbl", r=ar)
+                        + outopts.get("filter:a", outopts.get("af", None))
+                    )
+                    outpad = next(af.iter_output_pads(unlabeled_only=True), None)
+                    if outpad is not None:
+                        af = af >> "[out0]"
+                    inopt_vals = utils.analyze_input_stream(
+                        fields,
+                        "0",
+                        "audio",
+                        af,
+                        {"f": "lavfi"},
+                        {"src_type": "filtergraph"},
+                    )
+                    
+
+                opt_vals = [v or s for v, s in zip(opt_vals, inopt_vals)]
+
+    # assign the values to individual variables
+    ar, sample_fmt, ac = opt_vals
+
+    # sample format must be specified
     if sample_fmt is None:
-        # get pixel format from input
-        sample_fmt = sample_fmt_in
-        if sample_fmt:
-            if sample_fmt[-1] == "p":
-                # planar format is not supported
-                sample_fmt = sample_fmt[:-1]
-            outopts["sample_fmt"] = sample_fmt  # set the format
+        logger.warning(
+            'Sample format of audio stream "%s" could not be retrieved. Uses "dbl".',
+            outmap,
+        )
+        sample_fmt = outopts["sample_fmt"] = "dbl"
+    elif sample_fmt[-1] == "p":
+        # planar format is not supported
+        logger.warning(
+            "The audio stream %s uses a planar sample format '%s' which is not supported for audio data IO. Changed to %s.",
+            outmap,
+            sample_fmt,
+            sample_fmt[:-1],
+        )
+        sample_fmt = sample_fmt[:-1]
+        outopts["sample_fmt"] = sample_fmt  # set the format to non-planar
 
     # set output format and codec
     outopts["c:a"], outopts["f"] = utils.get_audio_codec(sample_fmt)
 
-    ac = ar = None
-    if not has_filter:
-        ac = outopts.get("ac", ac_in)
-        ar = outopts.get("ar", ar_in)
-
     # sample_fmt must be given
-    dtype, shape = utils.get_audio_format(sample_fmt, ac)
+    dtype, _ = utils.get_audio_format(sample_fmt, ac)
 
     return dtype, ac, ar
 

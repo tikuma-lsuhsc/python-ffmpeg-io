@@ -3,7 +3,6 @@
 
 import warnings
 from . import ffmpegprocess, utils, configure, FFmpegError, plugins, analyze
-from .probe import _audio_info as _probe_audio_info
 from .utils import log as log_utils
 
 __all__ = ["create", "read", "write", "filter", "detect"]
@@ -46,12 +45,19 @@ def _run_read(
     :rtype: (int, str)
     """
 
-    dtype, ac, rate = configure.finalize_audio_read_opts(args[0], istream="a:0")
+    outopts = args[0]["outputs"][0][1]
+    outopts["map"] = "0:a:0"
+    dtype, ac, rate = configure.finalize_audio_read_opts(
+        args[0],
+        input_info=[
+            {"src_type": "filtergraph" if outopts.get("f", None) == "lavfi" else "url"}
+        ],
+    )
 
     if sp_kwargs is not None:
         kwargs = {**sp_kwargs, **kwargs}
 
-    if dtype is None or ac is None or rate is None:
+    if ac is None or rate is None:
         configure.clear_loglevel(args[0])
 
         out = ffmpegprocess.run(*args, capture_log=True, **kwargs)

@@ -104,7 +104,7 @@ def test_filter():
         ],
     )
 
-    output_rate, output = audio.filter(expr, input_rate, input)
+    output_rate, output = audio.filter(expr, input_rate, input, show_log=True, loglevel ='verbose')
     assert output_rate == 22050
     assert output["shape"] == (22050, 2)
     assert output["dtype"] == input["dtype"]
@@ -125,7 +125,9 @@ def test_filter():
     output_rate, output = audio.filter(expr, input_rate, input)
     assert output_rate == 44100
     assert output["shape"] == (44100, 2)
-    assert output["dtype"] == input["dtype"]
+    assert output["dtype"] == '<f8'
+
+    output_rate, output = audio.filter("[in]bandpass[out]", input_rate, input)
 
 
 if __name__ == "__main__":

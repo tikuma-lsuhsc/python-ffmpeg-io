@@ -752,28 +752,6 @@ def query(
     return info
 
 
-def _audio_info(
-    url: str | BinaryIO | memoryview,
-    stream: str | None,
-    sp_kwargs: dict[str, Any] | None,
-    *,
-    f: str | None = None,
-) -> tuple[int | None, str | None, int | None]:
-    "returns (sample_rate, sample_fmt, channels) of the specified url/stream"
-    fields = ["sample_rate", "sample_fmt", "channels"]
-    q = query(
-        url,
-        "a:0" if stream is None else stream,
-        fields,
-        True,
-        False,
-        True,
-        sp_kwargs,
-        f=f,
-    )[0]
-    return tuple(q[f] for f in fields)
-
-
 def _video_info(
     url: str | BinaryIO | memoryview,
     stream: str | None,

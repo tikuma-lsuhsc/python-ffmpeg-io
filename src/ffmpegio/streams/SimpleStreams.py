@@ -280,11 +280,22 @@ class SimpleAudioReader(SimpleReaderBase):
     def _finalize(self, ffmpeg_args):
         # finalize FFmpeg arguments and output array
 
+        outopts = ffmpeg_args["outputs"][0][1]
+        outopts["map"] = "0:a:0"
         (
             self.dtype,
             ac,
             self.rate,
-        ) = configure.finalize_audio_read_opts(ffmpeg_args, istream="a:0")
+        ) = configure.finalize_audio_read_opts(
+            ffmpeg_args,
+            input_info=[
+                {
+                    "src_type": (
+                        "filtergraph" if outopts.get("f", None) == "lavfi" else "url"
+                    )
+                }
+            ],
+        )
 
         if ac is not None:
             self.shape = (ac,)
