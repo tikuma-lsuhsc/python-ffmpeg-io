@@ -6,6 +6,8 @@ from __future__ import annotations
 from .._typing import TYPE_CHECKING, Any
 from ..stream_spec import StreamSpecDict
 
+from .. import filtergraph as fgb
+
 if TYPE_CHECKING:
     from .Graph import Graph
 
@@ -29,8 +31,6 @@ def merge_audio(
 
     """
 
-    from .. import filtergraph as fg
-
     # number of input audio streams to be merged
     n_ain = len(streams)
 
@@ -52,8 +52,8 @@ def merge_audio(
             fopts["f"] = output_sample_fmt
 
         in_label = f"[{sspec}]"
-        return (in_label >> fg.aformat(**fopts)) if len(fopts) else in_label
+        return (in_label >> fgb.aformat(**fopts)) if len(fopts) else in_label
 
-    afilt = [match_sample(*st) for st in streams.items()] >> fg.amerge(inputs=n_ain)
+    afilt = [match_sample(*st) for st in streams.items()] >> fgb.amerge(inputs=n_ain)
 
     return (afilt >> output_pad_label) if output_pad_label else afilt
