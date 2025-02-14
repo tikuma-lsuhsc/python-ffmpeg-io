@@ -78,6 +78,7 @@ def connect(
     to_left: PAD_INDEX | str | list[PAD_INDEX | str] | None = None,
     chain_siso: bool = True,
     replace_sws_flags: bool | None = None,
+    inplace: bool = False,
 ) -> fgb.Graph | fgb.Chain:
     """connect two filtergraph objects and make explicit connections
 
@@ -91,6 +92,8 @@ def connect(
     :param replace_sws_flags: True to use `right` sws_flags if present,
                                 False to drop `right` sws_flags,
                                 None to throw an exception (default)
+    :param inplace: True to connect right filtergraph object to left filtergraph object (or vice versa).
+                    False (default) to make a new filtergraph object
     :return: new filtergraph object
 
     Notes
@@ -101,8 +104,8 @@ def connect(
     """
 
     # make sure right is a Graph object
-    left = fgb.as_filtergraph_object(left)
-    right = fgb.as_filtergraph_object(right)
+    left = fgb.as_filtergraph_object(left, copy=not inplace)
+    right = fgb.as_filtergraph_object(right, copy=not inplace)
 
     # present as a list of pad indices
     if not isinstance(from_left, list):
@@ -118,7 +121,9 @@ def connect(
         left, right, from_left, to_right, from_right, to_left, False
     )
 
-    return left._connect(right, fwd_links, bwd_links, chain_siso, replace_sws_flags)
+    return left._connect(
+        right, fwd_links, bwd_links, chain_siso, replace_sws_flags
+    )
 
 
 def join(
@@ -130,6 +135,7 @@ def join(
     unlabeled_only: bool = False,
     chain_siso: bool = True,
     replace_sws_flags: bool = None,
+    inplace: bool = False,
 ) -> fgb.Graph | None:
     """filtergraph auto-connector
 
@@ -151,6 +157,8 @@ def join(
     :param replace_sws_flags: True to use other's sws_flags if present,
                                 False to ignore other's sws_flags,
                                 None to throw an exception (default)
+    :param inplace: True to connect right filtergraph object to left filtergraph object (or vice versa).
+                    False (default) to make a new filtergraph object
     :return: Graph with the appended filter chains or None if inplace=True.
     """
 
@@ -163,8 +171,8 @@ def join(
         raise ValueError(f"{how=} is an unknown matching method")
 
     # make sure right is a Graph, Chain, or Filter object
-    left = fgb.as_filtergraph_object(left)
-    right = fgb.as_filtergraph_object(right)
+    left = fgb.as_filtergraph_object(left, copy=not inplace)
+    right = fgb.as_filtergraph_object(right, copy=not inplace)
 
     # handle joining empty graph
     if not right.get_num_chains():
@@ -242,6 +250,7 @@ def attach(
     right: fgb.abc.FilterGraphObject | str | list[fgb.abc.FilterGraphObject | str],
     left_on: PAD_INDEX | str | list[PAD_INDEX | str | None] | None = None,
     right_on: PAD_INDEX | str | list[PAD_INDEX | str | None] | None = None,
+    inplace: bool = False,
 ) -> fgb.Graph:
     """attach filter(s), chain(s), or label(s) to a filtergraph object
 
@@ -249,8 +258,8 @@ def attach(
     :param right: output filtergraph object, filtergraph expression, or label, or list thereof.
     :param left_on: pad_index, specify the pad on left, default to None (first available)
     :param right_on: pad index, specifies which pad on the right graph, defaults to None (first available)
-    :param right_first: True to preserve the chain indices of the right filtergraph object, defaults
-                        to False to preserve the chain order of the left object
+    :param inplace: True to connect right filtergraph object to left filtergraph object (or vice versa).
+                    False (default) to make a new filtergraph object
     :return: new filtergraph object
 
     One and only one of ``left`` or ``right`` may be a list or a label.
@@ -263,7 +272,7 @@ def attach(
 
     def check_obj(obj):
         try:
-            obj_label = fgb.as_filtergraph_object(obj)
+            obj_label = fgb.as_filtergraph_object(obj, copy=not inplace)
         except FiltergraphInvalidExpression:
             try:
                 obj_label = str(obj)
@@ -350,9 +359,13 @@ def attach(
         )
 
     if attach_right:
-        return left_objs_labels._attach(right_objs_labels, left_on, right_on)
+        return fgb.as_filtergraph_object(left_objs_labels, copy=not inplace)._attach(
+            right_objs_labels, left_on, right_on
+        )
     else:
-        return right_objs_labels._rattach(left_objs_labels, left_on, right_on)
+        return fgb.as_filtergraph_object(right_objs_labels, copy=not inplace)._rattach(
+            left_objs_labels, left_on, right_on
+        )
 
 
 def concatenate(*fgs):
@@ -364,6 +377,7 @@ def stack(
     *fgs: fgb.abc.FilterGraphObject,
     auto_link: bool = False,
     use_last_sws_flags: bool | None = None,
+    inplace: bool = False,
 ) -> fgb.Graph:
     """stack filtergraph objects
 
@@ -372,6 +386,8 @@ def stack(
     :param use_last_sws_flags: True to use ``sws_flags`` of the last object with one,
                                False to use ``sws_flags`` of the first object with one ``,
                                None to throw an exception if multiple ``sws_flags`` encountered (default)
+    :param inplace: True to connect right filtergraph object to left filtergraph object (or vice versa).
+                    False (default) to make a new filtergraph object
     :return: new filtergraph object
 
     Remarks
@@ -390,7 +406,7 @@ def stack(
     if n == 1:
         return fgs[0]
 
-    fg = fgb.as_filtergraph(fgs[0])
+    fg = fgb.as_filtergraph(fgs[0], copy=not inplace)
     replace_sws_flags = None
     for other in fgs[1:]:
         if use_last_sws_flags is not None:

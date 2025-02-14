@@ -649,30 +649,30 @@ class FilterGraphObject(ABC):
     # Filtergraph math operators
 
     def __add__(self, other: FilterGraphObject | str) -> fgb.Chain | fgb.Graph:
-        return fgb.join(self, other)
+        return fgb.join(self, other, inplace=False)
 
     def __radd__(self, other: FilterGraphObject | str) -> fgb.Chain | fgb.Graph:
-        return fgb.join(other, self)
+        return fgb.join(other, self, inplace=False)
 
     def __mul__(self, __n: int) -> fgb.Graph:
         """duplicate-n-stack"""
         if not isinstance(__n, int):
             return NotImplemented
-        return fgb.stack(*((self,) * __n))
+        return fgb.stack(*((self,) * __n), inplace=False)
 
     def __rmul__(self, __n: int) -> fgb.Graph:
         """duplicate-n-stack"""
         if not isinstance(__n, int):
             return NotImplemented
-        return fgb.stack(*((self,) * __n))
+        return fgb.stack(*((self,) * __n), inplace=False)
 
     def __or__(self, other: FilterGraphObject | str) -> fgb.Graph:
         """stack"""
-        return fgb.stack(self, other)
+        return fgb.stack(self, other, inplace=False)
 
     def __ror__(self, other: FilterGraphObject | str) -> fgb.Graph:
         """stack"""
-        return fgb.stack(other, self)
+        return fgb.stack(other, self, inplace=False)
 
     def __rshift__(
         self,
@@ -723,7 +723,7 @@ class FilterGraphObject(ABC):
             # parse other argument, separate the indices if given
             right, left_on, right_on = parse_other(other)
 
-        return fgb.attach(self, right, left_on, right_on)
+        return fgb.attach(self, right, left_on, right_on, inplace=False)
 
     def __rrshift__(
         self,
@@ -773,7 +773,7 @@ class FilterGraphObject(ABC):
             # parse other argument, separate the indices if given
             left, right_on, left_on = parse_other(other)
 
-        return fgb.attach(left, self, left_on, right_on)
+        return fgb.attach(left, self, left_on, right_on, inplace=False)
 
     def resolve_pad_index(
         self,
