@@ -33,6 +33,7 @@ from .stream_spec import (
     stream_spec as compose_stream_spec,
     StreamSpecDict,
     stream_type_to_media_type,
+    parse_map_option,
 )
 
 #################################
@@ -918,7 +919,7 @@ def resolve_raw_output_streams(
     map_options = [
         {"stream_specifier": {}, **opt}
         for opt in (
-            utils.parse_map_option(spec, parse_stream=True, input_file_id=input_file_id)
+            parse_map_option(spec, parse_stream=True, input_file_id=input_file_id)
             for spec in streams
         )
     ]
