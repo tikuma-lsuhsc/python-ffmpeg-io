@@ -5,7 +5,7 @@ from collections import UserDict
 from collections.abc import Generator, Mapping, Sequence, Callable
 
 
-from ..utils import is_map_option
+from ..stream_spec import is_map_option
 from ..errors import FFmpegioError
 from .typing import PAD_INDEX, PAD_PAIR, Literal
 
@@ -72,6 +72,10 @@ class GraphLinks(UserDict):
             if not (isinstance(label, str) and len(label)):
                 raise GraphLinks.Error(
                     "Pad label must be a string and has at least one character."
+                )
+            if no_stream_spec and is_map_option(label, allow_missing_file_id=True):
+                raise GraphLinks.Error(
+                    f"Pad label cannot be an input stream specifier ({label})."
                 )
 
     @staticmethod
@@ -437,7 +441,8 @@ class GraphLinks(UserDict):
 
         def iter(label, inpad, outpad):
             if outpad is not None or (
-                include_input_stream and is_map_option(label, allow_missing_file_id=True)
+                include_input_stream
+                and is_map_option(label, allow_missing_file_id=True)
             ):
                 for d in self.iter_inpad_ids(inpad):
                     yield (label, d, outpad)
@@ -461,7 +466,8 @@ class GraphLinks(UserDict):
         """
         for label, (inpad, outpad) in self.data.items():
             if outpad is None and not (
-                exclude_stream_specs and is_map_option(label, allow_missing_file_id=True)
+                exclude_stream_specs
+                and is_map_option(label, allow_missing_file_id=True)
             ):
                 for d in self.iter_inpad_ids(inpad):
                     yield (label, d)
