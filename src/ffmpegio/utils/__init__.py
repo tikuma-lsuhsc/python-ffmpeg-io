@@ -5,6 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from numbers import Number
 
+import logging
+
+logger = logging.getLogger("ffmpegio")
+
+
 from math import cos, radians, sin
 import re, fractions
 
