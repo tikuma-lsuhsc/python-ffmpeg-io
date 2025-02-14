@@ -15,6 +15,7 @@ import logging
 logger = logging.getLogger("ffmpegio")
 
 from .path import ffprobe, PIPE
+from .errors import FFmpegError
 
 # fmt:off
 __all__ = ['full_details', 'format_basic', 'streams_basic',
@@ -221,7 +222,7 @@ def _exec(
     # run ffprobe
     ret = ffprobe(args, **sp_opts)
     if ret.returncode != 0:
-        raise Exception(f"ffprobe execution failed\n\n{ret.stderr.decode('utf8')}\n")
+        raise FFmpegError(f"ffprobe execution failed\n\n{ret.stderr.decode('utf8')}\n")
 
     # decode output JSON string
     return json.loads(ret.stdout)
