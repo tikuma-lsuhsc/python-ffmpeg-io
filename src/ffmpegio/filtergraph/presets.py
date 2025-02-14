@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from .Graph import Graph
 
 
-def _build_video_basic_filter(
+def filter_video_basic(
     fill_color: str | None = None,
     remove_alpha: bool = False,
     scale: str | Sequence | None = None,

@@ -27,7 +27,7 @@ from namedpipe import NPopen
 
 from . import filtergraph as fgb
 from .filtergraph.abc import FilterGraphObject
-from .filtergraph.presets import merge_audio, _build_video_basic_filter
+from .filtergraph.presets import merge_audio, filter_video_basic
 from .utils.concat import FFConcat  # for typing
 from ._utils import as_multi_option, is_non_str_sequence
 from .stream_spec import (
@@ -403,7 +403,7 @@ def build_basic_vf(args, remove_alpha=None, ofile=0):
         if remove_alpha and "remove_alpha" not in fopts:
             fopts["remove_alpha"] = True
 
-        bvf = _build_video_basic_filter(**fopts)  # Graph is remove alpha else Chain
+        bvf = filter_video_basic(**fopts)  # Graph is remove alpha else Chain
         vf = outopts.get("vf", None)
         if vf:
             try:
