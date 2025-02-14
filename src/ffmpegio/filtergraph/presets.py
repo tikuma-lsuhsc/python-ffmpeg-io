@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-from ..typing import TYPE_CHECKING, Any, StreamSpecDict
-
-from collections.abc import Sequence
+from .._typing import TYPE_CHECKING, Any
+from ..stream_spec import StreamSpecDict
 
 if TYPE_CHECKING:
     from .Graph import Graph

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from .typing import (
+from ._typing import (
     Literal,
     Any,
     RawStreamDef,
     ProgressCallable,
     RawDataBlob,
-    StreamSpecDict,
     Unpack,
 )
+from .stream_spec import StreamSpecDict
 
 import contextlib
 from io import BytesIO
