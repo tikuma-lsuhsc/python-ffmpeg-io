@@ -279,7 +279,6 @@ def filter(
     expr,
     input_rate,
     input,
-    sample_fmt=None,
     progress=None,
     show_log=None,
     sp_kwargs=None,
@@ -318,7 +317,6 @@ def filter(
         *configure.array_to_audio_input(input_rate, data=input, **input_options),
     )
     outopts = configure.add_url(ffmpeg_args, "output", "-", options)[1][1]
-    outopts["sample_fmt"] = sample_fmt
     if expr:
         outopts["filter:a"] = expr
 
