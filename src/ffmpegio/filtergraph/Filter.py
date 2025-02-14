@@ -152,7 +152,7 @@ class Filter(fgb.abc.FilterGraphObject, tuple):
         """
 
         return (
-            fgb.Graph(self.data).compose(
+            fgb.Graph(self).compose(
                 show_unconnected_inputs, show_unconnected_outputs
             )
             if show_unconnected_inputs or show_unconnected_outputs
