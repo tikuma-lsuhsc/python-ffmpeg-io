@@ -91,7 +91,7 @@ class Graph(fgb.abc.FilterGraphObject, UserList):
         # convert str to a list of filter_specs
         if isinstance(filter_specs, fgb.Graph):
             links = filter_specs._links
-            sws_flags = filter_specs.sws_flags and filter_specs.sws_flags[1:]
+            sws_flags = filter_specs.sws_flags and [*filter_specs.sws_flags[1:]]
         elif isinstance(filter_specs, fgb.Chain):
             filter_specs = [filter_specs] if len(filter_specs) else ()
         elif filter_specs is not None:
@@ -105,9 +105,10 @@ class Graph(fgb.abc.FilterGraphObject, UserList):
                     "An empty filterchain found. All chains must be populated."
                 )
 
-            filter_specs = (fgb.Chain(fspec) for fspec in filter_specs)
-
-        UserList.__init__(self, () if filter_specs is None else filter_specs)
+        UserList.__init__(
+            self,
+            () if filter_specs is None else iter(fgb.Chain(c) for c in filter_specs),
+        )
 
         self._links = GraphLinks(links)
         """utils.fglinks.GraphLinks: filtergraph link specifications
