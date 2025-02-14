@@ -445,7 +445,14 @@ class FilterGraphObject(ABC):
         """
 
         return fgb.connect(
-            left, self, from_left, to_right, chain_siso, replace_sws_flags
+            left,
+            self,
+            from_left,
+            to_right,
+            from_right,
+            to_left,
+            chain_siso,
+            replace_sws_flags,
         )
 
     def join(
