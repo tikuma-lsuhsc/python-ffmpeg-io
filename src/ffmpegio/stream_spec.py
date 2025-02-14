@@ -42,7 +42,12 @@ class StreamSpecDict_Usable(StreamSpecDict_Options):
     usable: bool
 
 
-StreamSpecDict = Union[StreamSpecDict_Index, StreamSpecDict_Tag, StreamSpecDict_Usable]
+StreamSpecDict = Union[
+    StreamSpecDict_Index,
+    StreamSpecDict_Tag,
+    StreamSpecDict_Usable,
+    StreamSpecDict_Options,
+]
 
 
 class InputMapOptionDict(TypedDict):
