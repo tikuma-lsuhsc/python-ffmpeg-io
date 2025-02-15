@@ -510,7 +510,12 @@ def finalize_audio_read_opts(
             # fill the still missing values directly from the input url
             if not all(inopt_vals):
                 st_vals = utils.analyze_input_stream(
-                    fields, outmap, "audio", inurl, inopts, input_info[ifile]
+                    fields,
+                    outmap_fields["stream_specifier"],
+                    "audio",
+                    inurl,
+                    inopts,
+                    input_info[ifile],
                 )
                 inopt_vals = [v or s for v, s in zip(inopt_vals, st_vals)]
 
