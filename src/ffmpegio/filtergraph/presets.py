@@ -7,10 +7,13 @@ from .._typing import TYPE_CHECKING, Any, Sequence, Literal
 from ..stream_spec import StreamSpecDict
 from .abc import FilterGraphObject
 
+from functools import reduce
+
 from .. import filtergraph as fgb
 
 if TYPE_CHECKING:
     from .Graph import Graph
+    from .Chain import Chain
 
 
 def remove_video_alpha(
@@ -37,28 +40,30 @@ def filter_video_basic(
     square_pixels: (
         Literal["upscale", "downscale", "upscale_even", "downscale_even"] | None
     ) = None,
-) -> FilterGraphObject:
-    bg_color = fill_color or "white"
+) -> Chain:
 
-    vfilters = fgb.Chain()
-
+    vfilters = []
     if square_pixels == "upscale":
-        vfilters += "scale='max(iw,ih*dar)':'max(iw/dar,ih)':eval=init,setsar=1/1"
+        vfilters.append("scale='max(iw,ih*dar)':'max(iw/dar,ih)':eval=init,setsar=1/1")
     elif square_pixels == "downscale":
-        vfilters += "scale='min(iw,ih*dar)':'min(iw/dar,ih)':eval=init,setsar=1/1"
+        vfilters.append("scale='min(iw,ih*dar)':'min(iw/dar,ih)':eval=init,setsar=1/1")
     elif square_pixels == "upscale_even":
-        vfilters += "scale='trunc(max(iw,ih*dar)/2)*2':'trunc(max(iw/dar,ih)/2)*2':eval=init,setsar=1/1"
+        vfilters.append(
+            "scale='trunc(max(iw,ih*dar)/2)*2':'trunc(max(iw/dar,ih)/2)*2':eval=init,setsar=1/1"
+        )
     elif square_pixels == "downscale_even":
-        vfilters += "scale='trunc(min(iw,ih*dar)/2)*2':'trunc(min(iw/dar,ih)/2)*2':eval=init,setsar=1/1"
+        vfilters.append(
+            "scale='trunc(min(iw,ih*dar)/2)*2':'trunc(min(iw/dar,ih)/2)*2':eval=init,setsar=1/1"
+        )
     elif square_pixels is not None:
         raise ValueError(f"unknown `square_pixels` option value given: {square_pixels}")
 
     if crop:
         try:
             assert not isinstance(crop, str)
-            vfilters += fgb.Filter("crop", *crop)
+            vfilters.append(fgb.crop(*crop))
         except:
-            vfilters += fgb.Filter("crop", crop)
+            vfilters.append(fgb.crop(crop))
 
     if flip:
         try:
@@ -66,16 +71,16 @@ def filter_video_basic(
         except:
             raise Exception("Invalid flip filter specified.")
         if ftype % 2:
-            vfilters += "hflip"
+            vfilters.append("hflip")
         if ftype >= 2:
-            vfilters += "vflip"
+            vfilters.append("vflip")
 
     if transpose is not None:
         try:
             assert not isinstance(transpose, str)
-            vfilters += fgb.Filter("transpose", *transpose)
+            vfilters.append(fgb.transpose(*transpose))
         except:
-            vfilters += fgb.Filter("transpose", transpose)
+            vfilters.append(fgb.transpose(transpose))
 
     if scale:
         try:
@@ -84,11 +89,11 @@ def filter_video_basic(
             pass
         try:
             assert not isinstance(scale, str)
-            vfilters += fgb.Filter("scale", *scale)
+            vfilters.append(fgb.scale(*scale))
         except:
-            vfilters += fgb.Filter("scale", scale)
+            vfilters.append(fgb.scale(scale))
 
-    return vfilters
+    return sum(vfilters)
 
 
 def merge_audio(
