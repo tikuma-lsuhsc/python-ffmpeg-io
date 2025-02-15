@@ -190,36 +190,38 @@ def check_url(
 def add_url(
     args: FFmpegArgs,
     type: Literal["input", "output"],
-    url: FFmpegUrlType,
+    url: FFmpegUrlType | None,
     opts: dict[str, Any] | None = None,
     update: bool = False,
 ) -> tuple[int, FFmpegInputOptionTuple | FFmpegOutputOptionTuple]:
     """add new or modify existing url to input or output list
 
     :param args: ffmpeg arg dict (modified in place)
-    :param type: input or output
+    :param type: input or output (may use None to update later)
     :param url: url of the new entry
     :param opts: FFmpeg options associated with the url, defaults to None
     :param update: True to update existing input of the same url, default to False
     :return: file index and its entry
     """
 
-    type = f"{type}s"
-    filelist = args.get(type, None)
-    if filelist is None:
-        filelist = args[type] = []
+    # get current list of in/outputs
+    filelist = args[f"{type}s"]
     n = len(filelist)
+
+    # if updating, get the existing id
     id = next((i for i in range(n) if filelist[i][0] == url), None) if update else None
     if id is None:
+        # new entry
         id = n
-        filelist.append((url, opts and {**opts}))
+        filelist.append((url, {} if opts is None else {**opts}))
     elif opts is not None:
+        # update option dict
         filelist[id] = (
             url,
             (
-                opts and {**opts}
+                opts
                 if filelist[id][1] is None
-                else filelist[id][1] if opts is None else {**filelist[id][1], **opts}
+                else (filelist[id][1] if opts is None else {**filelist[id][1], **opts})
             ),
         )
     return id, filelist[id]
