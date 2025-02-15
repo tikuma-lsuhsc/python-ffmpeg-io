@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Sequence, Callable
 from numbers import Number
 
 import logging
@@ -18,9 +18,7 @@ from .._utils import *
 from ..stream_spec import *
 from ..filtergraph.abc import FilterGraphObject
 from .. import filtergraph as fgb
-from ..errors import FFmpegError
-
-from ..typing import Any
+from .._typing import Any, MediaType, InputSourceDict
 
 # TODO: auto-detect endianness
 # import sys
@@ -500,4 +498,38 @@ def array_to_video_options(data: Any | None = None) -> dict:
 
     s, pix_fmt = guess_video_format(*plugins.get_hook().video_info(obj=data))
     return {"f": "rawvideo", f"c:v": "rawvideo", f"s": s, f"pix_fmt": pix_fmt}
+
+
+def set_sp_kwargs_stdin(
+    url: str | None, info: InputSourceDict, sp_kwargs: dict = {}
+) -> tuple[str, dict | None, Callable]:
+    """configure sp_kwargs for ffprobe/ffmpeg call to pipe-in the data via stdin
+
+    :param url: input URL
+    :param info: input info
+    :param sp_kwargs: initial sp_kwargs keyword options
+    :return: tuple of url (or "pipe:0" if stdin data), updated sp_kwargs, and cleanup function
+    """
+
+    # ffprobe subprocess keywords
+    src_type = info["src_type"]
+    exit_fcn = lambda: None
+
+    if src_type not in ("url", "filtergraph"):
+        url = "pipe:0"
+        if src_type == "buffer":
+            sp_kwargs = {**sp_kwargs, "input": info["buffer"]}
+        elif src_type == "fileobj":
+            f = info["fileobj"]
+            sp_kwargs = {**sp_kwargs, "stdin": f}
+            if f.readable() and f.seekable():
+                pos = f.tell()
+                exit_fcn = lambda: f.seek(pos)  # restore the read cursor position
+            else:
+                logger.warning("file object must be seekable.")
+        else:
+            logger.warning("unknown input source type.")
+            sp_kwargs = None
+
+    return url, sp_kwargs, exit_fcn
 

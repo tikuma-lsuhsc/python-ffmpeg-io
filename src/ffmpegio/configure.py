@@ -1181,7 +1181,7 @@ def retrieve_input_stream_ids(
 
     # file/network input - process only if seekable
     # get ffprobe subprocess keywords
-    url, sp_kwargs, exit_fcn = set_sp_kwargs_stdin(url, info)
+    url, sp_kwargs, exit_fcn = utils.set_sp_kwargs_stdin(url, info)
     if sp_kwargs is None:
         # something failed (warning logged)
         return []
