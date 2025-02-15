@@ -394,7 +394,7 @@ def test_connect(fg, r, to_l, to_r, chain, out):
     [
         # fmt: off
         ("fps;crop", "trim;scale", None, False, "[UNC0]fps,trim[UNC2];[UNC1]crop,scale[UNC3]"),
-        ("[in1]fps;crop[ou1]", "[in2]trim;scale[out2]", None, True, "[in1]fps[L0];[UNC0]crop[L1];[L0]trim[UNC1];[L1]scale[out2]"),
+        ("[in1]fps;crop[ou1]", "[in2]trim;scale[out2]", None, True, "[in1]fps[L0];[UNC0]crop[ou1];[in2]trim[UNC1];[L0]scale[out2]"),
         ("fps", "overlay", 'per_chain', False, "[UNC0]fps[L0];[L0][UNC1]overlay[UNC2]"),
         # fmt: on
     ],
