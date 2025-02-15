@@ -55,7 +55,7 @@ def __getattr__(name):
 
 from . import ffmpegprocess
 
-from .errors import FFmpegError
+from .errors import FFmpegError, FFmpegioError
 from .utils.concat import FFConcat
 from .filtergraph import Graph as FilterGraph
 from . import devices, ffmpegprocess, caps, probe, audio, image, video, media
@@ -70,7 +70,7 @@ deprecate_core()
 # fmt:off
 __all__ = ["ffmpeg_info", "get_path", "set_path", "is_ready", "ffmpeg", "ffprobe",
     "transcode", "caps", "probe", "audio", "image", "video", "media", "devices",
-    "open", "ffmpegprocess", "FFmpegError", "FilterGraph", "FFConcat", "use"]
+    "open", "ffmpegprocess", "FFmpegError", "FFmpegioError", "FilterGraph", "FFConcat", "use"]
 # fmt:on
 
 __version__ = "0.11.0"
