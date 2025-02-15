@@ -209,22 +209,22 @@ def add_url(
     n = len(filelist)
 
     # if updating, get the existing id
-    id = next((i for i in range(n) if filelist[i][0] == url), None) if update else None
-    if id is None:
+    file_id = next((i for i in range(n) if filelist[i][0] == url), None) if update else None
+    if file_id is None:
         # new entry
-        id = n
+        file_id = n
         filelist.append((url, {} if opts is None else {**opts}))
     elif opts is not None:
         # update option dict
-        filelist[id] = (
+        filelist[file_id] = (
             url,
             (
                 opts
-                if filelist[id][1] is None
-                else (filelist[id][1] if opts is None else {**filelist[id][1], **opts})
+                if filelist[file_id][1] is None
+                else (filelist[file_id][1] if opts is None else {**filelist[file_id][1], **opts})
             ),
         )
-    return id, filelist[id]
+    return file_id, filelist[file_id]
 
 
 def has_filtergraph(args: FFmpegArgs, type: MediaType) -> bool:
