@@ -115,7 +115,13 @@ mul_vid_streams = [mul_streams[0], mul_streams[2]]
         ({"src_type": "url"}, mul_url, {}, None, mul_streams),
         ({"src_type": "fileobj"}, mul_url, {}, "v", mul_vid_streams),
         ({"src_type": "buffer"}, mul_url, {}, "v", mul_vid_streams),
-        ({"src_type": "filtergraph"}, "color=c=pink [out0]", {}, None, [(0, "video")]),
+        (
+            {"src_type": "filtergraph"},
+            "color=c=pink [out0]",
+            {"f": "lavfi"},
+            None,
+            [(0, "video")],
+        ),
     ],
 )
 def test_retrieve_input_stream_ids(info, url, opts, stream_spec, ret):

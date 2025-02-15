@@ -1,3 +1,4 @@
+import pytest
 from ffmpegio import image, probe, transcode, FFmpegError
 import tempfile, re
 from os import path
@@ -53,7 +54,7 @@ def test_read_write():
     D = image.read(url, pix_fmt="gray")
     with tempfile.TemporaryDirectory() as tmpdirname:
         out_url = path.join(tmpdirname, re.sub(r"\..*?$", outext, path.basename(url)))
-        print(out_url, C['shape'])
+        print(out_url, C["shape"])
         image.write(out_url, C)
         print(probe.video_streams_basic(out_url))
         C = image.read(out_url, pix_fmt="rgba", show_log=True)
@@ -74,31 +75,25 @@ def test_read_write():
     # plt.show()
 
 
-def test_read_basic_filter():
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        dict(
+            pix_fmt="rgb24",
+            fill_color="red",
+            crop=(300, 50),
+            flip="horizontal",
+            transpose="clock",
+        ),
+        dict(s=(100, -2)),
+        dict(fill_color="red"),
+        dict(fill_color="red", pix_fmt="rgb24"),
+    ],
+)
+def test_read_basic_filter(kwargs):
 
     url = "tests/assets/ffmpeg-logo.png"
-
-    B = image.read(
-        url,
-        show_log=True,
-        pix_fmt="rgb24",
-        fill_color="red",
-        crop=(300, 50),
-        flip="horizontal",
-        transpose="clock",
-    )
-
-    B = image.read(url, show_log=True, s=(100, -2))
-    print(B['shape'])
-
-    url = "tests/assets/ffmpeg-logo.png"
-    B = image.read(
-        url,
-        show_log=True,
-        fill_color="red",
-    )
-
-    B = image.read(url, show_log=True, fill_color="red", pix_fmt="rgb24")
+    image.read(url, show_log=True, **kwargs)
 
 
 def test_square_pixels():
@@ -113,11 +108,11 @@ def test_square_pixels():
         Bue = image.read(out_url, square_pixels="upscale_even")
         Bde = image.read(out_url, square_pixels="downscale_even")
 
-        print(B['shape'])
-        print(Bu['shape'])
-        print(Bd['shape'])
-        print(Bue['shape'])
-        print(Bde['shape'])
+        print(B["shape"])
+        print(Bu["shape"])
+        print(Bd["shape"])
+        print(Bue["shape"])
+        print(Bde["shape"])
 
 
 if __name__ == "__main__":
