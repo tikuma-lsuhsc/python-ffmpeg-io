@@ -13,11 +13,10 @@ logger = logging.getLogger("ffmpegio")
 from math import cos, radians, sin
 import re, fractions
 
-from .. import caps, plugins
+from .. import caps, plugins, probe
 from .._utils import *
 from ..stream_spec import *
-from ..filtergraph.abc import FilterGraphObject
-from .. import filtergraph as fgb
+from ..errors import FFmpegError, FFmpegioError
 from .._typing import Any, MediaType, InputSourceDict
 
 # TODO: auto-detect endianness
@@ -533,3 +532,51 @@ def set_sp_kwargs_stdin(
 
     return url, sp_kwargs, exit_fcn
 
+
+def analyze_input_stream(
+    fields: list[str],
+    stream: str,
+    media_type: MediaType,
+    input_url: str | None,
+    input_opts: dict,
+    input_info: InputSourceDict,
+) -> list:
+    """analyze a stream and return requested field values
+
+    :param fields: a list of stream properties
+    :param stream: stream specifier, first one is returned if it yields more than one stream,
+    :param input_url: url or None if piped or fileobj
+    :param input_opts: input options
+    :param input_info: input infomration
+    :raises NotImplementedError: _description_
+    :return values of the requested fields of the stream
+    """
+
+    fields = [*fields, "codec_type"]
+    input_url, sp_kwargs, exit_fcn = set_sp_kwargs_stdin(input_url, input_info)
+    try:
+        q = probe.query(
+            input_url,
+            stream,
+            fields,
+            keep_optional_fields=True,
+            keep_str_values=False,
+            cache_output=True,
+            sp_kwargs=sp_kwargs,
+            f=input_opts.get("f", None),
+        )
+    except FFmpegError:
+        # no change
+        return [None] * (len(fields) - 1)
+    else:
+        q = [i for i in q if i["codec_type"] == media_type]
+        if len(q) != 1:
+            raise FFmpegioError(
+                f"Specified {stream=} must resolve to one and only one {media_type} stream."
+            )
+    finally:
+        # rewind fileobj if possible
+        exit_fcn()
+
+    q = q[0]
+    return [q.get(f, None) for f in fields[:-1]]
