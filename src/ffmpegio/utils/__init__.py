@@ -233,6 +233,7 @@ def get_audio_format(fmt: str, ac: int | None = None) -> str | tuple[str, tuple[
     :param ac: number of channels, default to None (to return only dtype)
     :return: data type string and array shape tuple
     """
+
     try:
         dtype = {
             "u8": "|u1",

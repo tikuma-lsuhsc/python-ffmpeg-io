@@ -210,10 +210,10 @@ def _exec(
 
     if isinstance(url, Buffer):
         sp_opts["input"] = url
-        url = 'pipe:0'
+        url = "pipe:0"
     elif isinstance(url, IOBase):
         sp_opts["stdin"] = url
-        url = 'pipe:0'
+        url = "pipe:0"
     else:
         url = str(url)
 
@@ -247,7 +247,7 @@ def _run(
 
     # TODO - enable caching
     if cache_output:
-        logger.warning('caching of previous ffprobe outputs is disabled.')
+        logger.warning("caching of previous ffprobe outputs is disabled.")
         cache_output = False
 
     entries = _compose_entries(entries)

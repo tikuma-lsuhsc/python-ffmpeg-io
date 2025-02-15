@@ -8,7 +8,7 @@ from .exceptions import *
 
 from .. import filtergraph as fgb
 
-from .._utils import zip # pre-py310 compatibility
+from .._utils import zip  # pre-py310 compatibility
 
 
 __all__ = ["FilterGraphObject"]

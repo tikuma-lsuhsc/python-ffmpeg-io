@@ -121,9 +121,7 @@ def connect(
         left, right, from_left, to_right, from_right, to_left, False
     )
 
-    return left._connect(
-        right, fwd_links, bwd_links, chain_siso, replace_sws_flags
-    )
+    return left._connect(right, fwd_links, bwd_links, chain_siso, replace_sws_flags)
 
 
 def join(

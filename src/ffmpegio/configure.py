@@ -481,6 +481,7 @@ def finalize_audio_read_opts(
     * If complex filtergraph(s) is used, args['global_options']['filter_complex'] must be a list of fgb.Graph objects
 
     """
+
     options = ["ar", "sample_fmt", "ac"]
     fields = ["sample_rate", "sample_fmt", "channels"]
 
@@ -501,7 +502,7 @@ def finalize_audio_read_opts(
             # fg = fgb.stack(args["global_options"]["filter_complex"])
         else:
             ifile = outmap_fields["input_file_id"]
-            
+
             # get input option values
             inurl, inopts = args["inputs"][ifile]
             inopt_vals = [inopts.get(o, None) for o in options]
@@ -1147,7 +1148,7 @@ def process_url_inputs(
     """analyze and process heterogeneous input url argument
 
     :param args: FFmpeg argument dict, `args['inputs']` receives all the new inputs.
-                 If input is a buffer, a fileobj, or an FFconcat, the first element 
+                 If input is a buffer, a fileobj, or an FFconcat, the first element
                  of the FFmpeg inputs entry is set to 'None', to be replaced by
                  a pipe expression.
     :param urls: list of input urls/data or a pair of input url and its options

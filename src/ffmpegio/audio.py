@@ -145,9 +145,7 @@ def create(expr, *args, progress=None, show_log=None, sp_kwargs=None, **options)
         )
 
     ffmpeg_args = configure.empty()
-    configure.add_url(
-        ffmpeg_args, "input", url, {**input_options, "f": "lavfi"}
-    )[1][1]
+    configure.add_url(ffmpeg_args, "input", url, {**input_options, "f": "lavfi"})[1][1]
     configure.add_url(ffmpeg_args, "output", "-", {"sample_fmt": "dbl", **options})[1][
         1
     ]
