@@ -48,10 +48,10 @@ def test_array_to_video_input():
 def test_add_url():
 
     url = "test.mp4"
-    args = {}
-    args_expected = {}
+    args = configure.empty()
+    args_expected = configure.empty()
     idx, entry = configure.add_url(args, "input", url, None)
-    args_expected["inputs"] = [(url, None)]
+    args_expected["inputs"] = [(url, {})]
     assert idx == 0 and entry == args_expected["inputs"][0] and args == args_expected
 
     idx, entry = configure.add_url(args, "input", url, {"f": "rawvideo"}, update=True)
@@ -73,15 +73,15 @@ def test_add_url():
 def test_add_urls():
 
     url = ["test.mp4", "test1.mp4", "test2.mp4", "test3.mp4", "test4.mp4"]
-    args = {}
+    args = configure.empty()
 
     # urls: str | tuple[str, dict | None] | Sequence[str | tuple[str, dict | None]],
-    assert configure.add_urls(args, "input", url[0]) == [(0, (url[0], None))]
-    assert configure.add_urls(args, "input", (url[1], None)) == [(1, (url[1], None))]
+    assert configure.add_urls(args, "input", url[0]) == [(0, (url[0], {}))]
+    assert configure.add_urls(args, "input", (url[1], None)) == [(1, (url[1], {}))]
     assert configure.add_urls(args, "input", (url[2], {})) == [(2, (url[2], {}))]
     assert configure.add_urls(args, "input", [url[3], url[4]]) == [
-        (3, (url[3], None)),
-        (4, (url[4], None)),
+        (3, (url[3], {})),
+        (4, (url[4], {})),
     ]
 
 

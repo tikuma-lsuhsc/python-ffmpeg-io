@@ -48,8 +48,8 @@ FFmpegOutputType = Literal["url", "fileobj"]
 FFmpegInputUrlComposite = Union[FFmpegUrlType, FFConcat, FilterGraphObject, IO, Buffer]
 FFmpegOutputUrlComposite = Union[FFmpegUrlType, IO]
 
-FFmpegInputOptionTuple = tuple[FFmpegUrlType | FilterGraphObject, dict | None]
-FFmpegOutputOptionTuple = tuple[FFmpegUrlType, dict | None]
+FFmpegInputOptionTuple = tuple[FFmpegUrlType | FilterGraphObject, dict]
+FFmpegOutputOptionTuple = tuple[FFmpegUrlType, dict]
 
 
 class FFmpegArgs(TypedDict):
