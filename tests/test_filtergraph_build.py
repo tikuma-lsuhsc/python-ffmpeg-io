@@ -1,6 +1,6 @@
 from os import path
 from tempfile import TemporaryDirectory
-from ffmpegio import ffmpegprocess, filtergraph as fgb
+from ffmpegio import ffmpegprocess, filtergraph as fgb, FFmpegioError
 from ffmpegio.filtergraph import Chain
 from pprint import pprint
 import pytest
@@ -48,7 +48,7 @@ def test_connect(left, right, from_left, to_right, chain_siso, ret):
 def test_join(left, right, how, n_links, strict, unlabeled_only, ret):
 
     if ret is None:
-        with pytest.raises(ValueError):
+        with pytest.raises(FFmpegioError):
             fgb.join(left, right, how, n_links, strict, unlabeled_only)
     else:
         fg = fgb.join(left, right, how, n_links, strict, unlabeled_only)
