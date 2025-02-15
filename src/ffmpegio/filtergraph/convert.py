@@ -114,6 +114,9 @@ def as_filtergraph_object(
              No copy is performed if the input is already a ``Graph`` and ``copy=False``.
     """
 
+    if not filter_specs:
+        return fgb.Chain()
+
     if isinstance(filter_specs, (fgb.Filter, fgb.Chain, fgb.Graph)):
         return type(filter_specs)(filter_specs) if copy else filter_specs
 
