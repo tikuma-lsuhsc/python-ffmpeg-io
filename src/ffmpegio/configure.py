@@ -27,7 +27,13 @@ from namedpipe import NPopen
 from . import utils, probe
 from . import filtergraph as fgb
 from .filtergraph.abc import FilterGraphObject
-from .filtergraph.presets import merge_audio, filter_video_basic, remove_video_alpha
+from .filtergraph.presets import (
+    merge_audio,
+    filter_video_basic,
+    remove_video_alpha,
+    temp_video_src,
+    temp_audio_src,
+)
 from .utils.concat import FFConcat  # for typing
 from ._utils import as_multi_option, is_non_str_sequence
 from .stream_spec import (
@@ -66,8 +72,9 @@ class RawOutputInfoDict(TypedDict):
     dst_type: FFmpegOutputType  # True if file path/url
     user_map: str | None  # user specified map option
     media_type: MediaType | None  #
-    input_file_id: NotRequired[int | None]
+    input_id: NotRequired[int | None]
     input_stream_id: NotRequired[int | None]
+    media_info: NotRequired[dict[str, Any]]
     pipe: NotRequired[NPopen]
 
 
@@ -232,8 +239,6 @@ def has_filtergraph(args: FFmpegArgs, type: MediaType) -> bool:
 
     :param args: FFmpeg argument dict
     :param type: filter type
-    :param file_id: specify output file id (ignored if type=='complex'), defaults to None (or 0)
-    :param stream_id: stream, defaults to None
     :return: True if filter graph is specified
     """
     try:
@@ -336,12 +341,10 @@ def finalize_video_read_opts(
         if has_simple_filter:
 
             # create a source chain with matching spec and attach it to the af graph
-            r, pix_fmt, s = inopt_vals
-            vf = (
-                fgb.color(s=s, r=r)
-                + fgb.format(pix_fmts=pix_fmt)
-                + outopts.get("filter:v", outopts.get("vf", None))
+            vf = temp_video_src(outopts, *inopt_vals) + outopts.get(
+                "filter:v", outopts.get("vf", None)
             )
+
             outpad = next(vf.iter_output_pads(unlabeled_only=True), None)
             if outpad is not None:
                 vf = vf >> "[out0]"
@@ -526,12 +529,9 @@ def finalize_audio_read_opts(
             if "af" in outopts or "filter:a" in outopts:
 
                 # create a source chain with matching specs and attach it to the af graph
-                ar, sample_fmt, ac = inopt_vals
-                af = (
-                    fgb.aevalsrc("|".join(["0"] * ac))
-                    + fgb.aformat(sample_fmts=sample_fmt or "dbl", r=ar)
-                    + outopts.get("filter:a", outopts.get("af", None))
-                )
+                af = temp_audio_src(*inopt_vals)
+
+                af = af + outopts.get("filter:a", outopts.get("af", None))
                 inopt_vals = utils.analyze_input_stream(
                     fields,
                     "0",

@@ -141,3 +141,13 @@ def merge_audio(
     afilt = [match_sample(*st) for st in streams.items()] >> fgb.amerge(inputs=n_ain)
 
     return (afilt >> output_pad_label) if output_pad_label else afilt
+
+
+def temp_video_src(r, pix_fmt, s):
+    return fgb.color(s=s, r=r) + fgb.format(pix_fmts=pix_fmt)
+
+
+def temp_audio_src(ar, sample_fmt, ac):
+    return fgb.aevalsrc("|".join(["0"] * ac)) + fgb.aformat(
+        sample_fmts=sample_fmt or "dbl", r=ar
+    )
