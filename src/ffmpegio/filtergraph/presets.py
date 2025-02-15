@@ -13,9 +13,23 @@ if TYPE_CHECKING:
     from .Graph import Graph
 
 
+def remove_video_alpha(
+    fill_color: str, input_label: str | None = None, output_label: str | None = None
+) -> Graph:
+
+    fg = fgb.Graph("scale2ref[l2],[l2]overlay=shortest=1").rconnect(
+        f"color=c={fill_color}", (0, 0, 0), (0, 0, 0)
+    )
+
+    if input_label is not None:
+        fg.add_label(input_label, (1, 0, 1))
+    if output_label is not None:
+        fg.add_label(output_label, outpad=(1, 1, 0))
+
+    return fg
+
+
 def filter_video_basic(
-    fill_color: str | None = None,
-    remove_alpha: bool = False,
     scale: str | Sequence | None = None,
     crop: str | Sequence | None = None,
     flip: Literal["horizontal", "vertical", "both"] | None = None,
@@ -26,13 +40,7 @@ def filter_video_basic(
 ) -> FilterGraphObject:
     bg_color = fill_color or "white"
 
-    vfilters = (
-        fgb.Graph(
-            f"color=c={bg_color}[l1];[l1][in]scale2ref[l2],[l2]overlay=shortest=1"
-        )
-        if remove_alpha
-        else fgb.Chain()
-    )
+    vfilters = fgb.Chain()
 
     if square_pixels == "upscale":
         vfilters += "scale='max(iw,ih*dar)':'max(iw/dar,ih)':eval=init,setsar=1/1"

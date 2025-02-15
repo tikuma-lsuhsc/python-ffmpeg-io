@@ -349,71 +349,69 @@ def check_alpha_change(args, dir=None, ifile=0, ofile=0):
     return utils.alpha_change(inopts.get("pix_fmt", None), outopts.get("pix_fmt", None))
 
 
-def build_basic_vf(args, remove_alpha=None, ofile=0):
+def build_basic_vf(
+    args: FFmpegArgs, remove_alpha: bool | None = None, ofile: int = 0
+) -> bool:
     """convert basic VF options to vf option
 
-    :param args: FFmpeg dict
-    :type args: dict
+    :param args: FFmpeg dict (may be modified if vf is added/changed)
     :param remove_alpha: True to add overlay filter to add a background color, defaults to None
     :                    This argument would be ignored if `'remove_alpha'` key is defined in `'args'`.
-    :type remove_alpha: bool, optional
     :param ofile: output file id, defaults to 0
-    :type ofile: int, optional
+    :return: True if vf option is added or changed
     """
 
     # get output opts, nothing to do if no option set
     outopts = args["outputs"][ofile][1]
-    if outopts is None:
-        return
 
     # extract the options
     fopts = {
-        name: outopts.pop(name)
-        for name in (
-            "fill_color",
-            "crop",
-            "flip",
-            "transpose",
-            "square_pixels",
-            "remove_alpha",
-        )
-        if name in outopts
+        name: outopts.pop(name, None)
+        for name in ("crop", "flip", "transpose", "square_pixels")
     }
+    fill_color, remove_alpha = (
+        outopts.pop(name, defval)
+        for name, defval in zip(("fill_color", "remove_alpha"), (None, remove_alpha))
+    )
+    if fill_color is not None:
+        remove_alpha = True
 
-    # check if output needs to be scaled
+    # if `s` output option contains negative number, use scale filter
     scale = outopts.get("s", None)
-    do_scale = scale is not None
-    if do_scale:
+    if scale is not None:
         try:
-            m = re.match(r"(\d+)x(\d+)", scale)
+            # if given a string -s option value
+            m = re.match(r"(-?\d+)x(-?\d+)", scale)
             scale = (int(m[1]), int(m[2]))
         except:
             pass
-        try:
-            do_scale = len(scale) > 2 or (scale[0] <= 0 or scale[1] <= 0)
-        except:
-            do_scale = False
 
-    nfo = len(fopts)
-    if (nfo and (nfo > 1 or "fill_color" not in fopts)) or remove_alpha or do_scale:
-        if do_scale:
+        if len(scale) != 2 or scale[0] <= 0 or scale[1] <= 0:
+            # must use scale filter, move the option from output to filter
+            outopts.pop("s")
             fopts["scale"] = scale
-            del outopts["s"]
 
-        if remove_alpha and "remove_alpha" not in fopts:
-            fopts["remove_alpha"] = True
+    basic = any(fopts.values())
+    if not (basic or remove_alpha):
+        return False  # no filter needed
 
-        bvf = filter_video_basic(**fopts)  # Graph is remove alpha else Chain
-        vf = outopts.get("vf", None)
-        if vf:
-            try:
-                outopts["vf"] = vf + bvf
-            except Exception as e:
-                raise FFmpegioError(
-                    f"Cannot append the basic video filter to the user specified video filter (vf):\n  {e}"
-                )
-        else:
-            outopts["vf"] = bvf
+    # existing simple filter
+    vf = outopts.pop("filter:v", outopts.pop("vf", None)) or fgb.Chain()
+
+    if basic:
+        vf = vf + filter_video_basic(**fopts)  # Graph is remove alpha else Chain
+
+    if remove_alpha:
+        if fill_color is None:
+            logger.warning(
+                "`fill_color` option not specified, uses white background color by default."
+            )
+            fill_color = "white"
+        vf = vf + remove_video_alpha(fill_color)
+
+    outopts["vf"] = vf
+
+    return True
 
 
 def finalize_audio_read_opts(
