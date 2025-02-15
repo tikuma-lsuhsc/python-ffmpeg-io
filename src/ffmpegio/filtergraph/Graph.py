@@ -97,6 +97,9 @@ class Graph(fgb.abc.FilterGraphObject, UserList):
         elif filter_specs is not None:
             if isinstance(filter_specs, fgb.Filter):
                 filter_specs = [[filter_specs]]
+            elif not len(filter_specs):
+                filter_specs = []
+                links = sws_flags = None
             elif isinstance(filter_specs, str):
                 filter_specs, links, sws_flags = filter_utils.parse_graph(filter_specs)
 
