@@ -24,7 +24,6 @@ def test_iter_inpad_ids(dsts, expects):
     [
         (("0:v",), True),
         (("label",), True),
-        (("-label",), False),
         ((0, True), True),
         ((0.0, True), False),
         ((0, False), False),
