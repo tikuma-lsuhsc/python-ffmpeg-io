@@ -93,7 +93,7 @@ def filter_video_basic(
         except:
             vfilters.append(fgb.scale(scale))
 
-    return sum(vfilters)
+    return sum(vfilters, start=fgb.Chain())
 
 
 def merge_audio(
