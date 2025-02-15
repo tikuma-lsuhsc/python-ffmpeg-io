@@ -752,34 +752,6 @@ def query(
     return info
 
 
-def _video_info(
-    url: str | BinaryIO | memoryview,
-    stream: str | None,
-    sp_kwargs: dict[str, Any] | None,
-    f: str | None = None,
-) -> tuple[
-    str | None,
-    int | None,
-    int | None,
-    Fraction | Literal["0/0"] | None,
-    Fraction | None,
-]:
-    "returns (pix_fmt, width, height, avg_frame_rate, r_frame_rate) of the specified url/stream"
-
-    fields = ["pix_fmt", "width", "height", "avg_frame_rate", "r_frame_rate"]
-    q = query(
-        url,
-        "v:0" if stream is None else stream,
-        fields,
-        True,
-        False,
-        True,
-        sp_kwargs,
-        f=f,
-    )[0]
-    return tuple(q[f] for f in fields)
-
-
 def frames(
     url: str | BinaryIO | memoryview,
     entries: Sequence[str] | None = None,

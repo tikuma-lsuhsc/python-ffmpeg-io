@@ -24,7 +24,14 @@ def _run_read(*args, show_log=None, sp_kwargs=None, **kwargs):
     :rtype: object
     """
 
-    dtype, shape, r = configure.finalize_video_read_opts(args[0], istream="v:0")
+    outopts = args[0]["outputs"][0][1]
+    outopts["map"] = "0:v:0"
+    dtype, shape, r = configure.finalize_video_read_opts(
+        args[0],
+        input_info=[
+            {"src_type": "filtergraph" if outopts.get("f", None) == "lavfi" else "url"}
+        ],
+    )
 
     if sp_kwargs is not None:
         kwargs = {**sp_kwargs, **kwargs}

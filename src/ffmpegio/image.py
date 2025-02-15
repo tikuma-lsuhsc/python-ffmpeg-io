@@ -1,5 +1,4 @@
 from . import ffmpegprocess, utils, configure, FFmpegError, plugins
-from .probe import _video_info as _probe_video_info
 from .utils import log as log_utils
 
 __all__ = ["create", "read", "write", "filter"]
@@ -25,7 +24,14 @@ def _run_read(*args, show_log=None, sp_kwargs=None, **kwargs):
     :rtype: object
     """
 
-    dtype, shape, _ = configure.finalize_video_read_opts(args[0], istream="v:0")
+    outopts = args[0]["outputs"][0][1]
+    outopts["map"] = "0:v:0"
+    dtype, shape, _ = configure.finalize_video_read_opts(
+        args[0],
+        input_info=[
+            {"src_type": "filtergraph" if outopts.get("f", None) == "lavfi" else "url"}
+        ],
+    )
 
     if sp_kwargs is not None:
         kwargs = {**sp_kwargs, **kwargs}

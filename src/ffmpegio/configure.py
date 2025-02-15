@@ -27,7 +27,7 @@ from namedpipe import NPopen
 
 from . import filtergraph as fgb
 from .filtergraph.abc import FilterGraphObject
-from .filtergraph.presets import merge_audio, filter_video_basic
+from .filtergraph.presets import merge_audio, filter_video_basic, remove_video_alpha
 from .utils.concat import FFConcat  # for typing
 from ._utils import as_multi_option, is_non_str_sequence
 from .stream_spec import (
@@ -264,47 +264,100 @@ def has_filtergraph(args: FFmpegArgs, type: MediaType) -> bool:
 
 
 def finalize_video_read_opts(
-    args: FFmpegArgs, ofile: int = 0, ifile: int = 0, istream: str | None = None
-) -> tuple[str, tuple[int, int], Fraction]:
+    args: FFmpegArgs,
+    ofile: int = 0,
+    input_info: list[InputSourceDict] = [],
+) -> tuple[str, tuple[int, int, int] | None, Fraction | None]:
+    """finalize raw video read output options
 
-    inurl, inopts = args["inputs"][ifile]
-    if inopts is None:
-        inopts = {}
+    :param args: FFmpeg arguments (will be modified)
+    :param ofile: output index, defaults to 0
+    :param input_info: source information of the inputs, defaults to []
+    :return dtype: Numpy-style buffer data type string
+    :return s: video shape tuple (height, width, nb_components)
+    :return r: video framerate
+    """
+
+    options = ["r", "pix_fmt", "s"]
+    fields = ["pix_fmt", "width", "height", "r_frame_rate", "avg_frame_rate"]
+
+    def flds2opts(pix_fmt, width, height, r1, r2):
+        return r1 or r2, pix_fmt, (width, height) if width and height else None
+
     outopts = args["outputs"][ofile][1]
+    outmap = outopts["map"]
+    outmap_fields = parse_map_option(outmap)
+    has_simple_filter = "vf" in outopts or "filter:v" in outopts
+    fill_color = outopts.get('fill_color',None)
+    if fill_color is not None and 'remove_alpha' not in outopts:
+        outopts.pop('fill_color')
 
-    pix_fmt_in = inopts.get("pix_fmt", None)
-    w_in, h_in = inopts.get("s", (None, None))
-    r_in = inopts.get("r", None)
+    # use the output option by default
+    opt_vals = [outopts.get(o, None) for o in options]
 
-    if (
-        isinstance(inurl, (str, Path))
-        and inopts.get("f", None) != "lavfi"
-        and not (pix_fmt_in and w_in and h_in and r_in)
-    ):
-        # TODO: handle lavfi filter processing
-        try:
-            # ["pix_fmt", "width", "height", "avg_frame_rate", "r_frame_rate"]
-            v_pix_fmt, v_width, v_height, vr1, vr2 = probe._video_info(
-                inurl, istream, None
-            )
-            pix_fmt_in, w_in, h_in, r_in = (
-                x or y
-                for x, y in zip(
-                    (pix_fmt_in, w_in, h_in, r_in),
-                    (v_pix_fmt, v_width, v_height, vr1 or vr2),
+    # get the options of the input/filtergraph output
+    if "linklabel" in outmap_fields:  # mapping filtergraph output
+        # must be mapped a linklabel of a filter_complex global option
+        logger.warning(
+            "Pre-analysis of complex filtergraphs is not currently available."
+        )
+        inopt_vals = [None, None, None]
+        # combine all the filtergraphs only for the analysis purpose
+        # fg = fgb.stack(args["global_options"]["filter_complex"])
+    else:
+        # insert basic video filter if specified
+        build_basic_vf(args, False, ofile)
+
+        ifile = outmap_fields["input_file_id"]
+
+        # check the input option data
+        inurl, inopts = args["inputs"][ifile]
+
+        # get input options
+        inopt_vals = [inopts.get(o, None) for o in options]
+
+        # directly from the input url (if not forced via input options)
+        if not all(inopt_vals):
+            st_vals = flds2opts(
+                *utils.analyze_input_stream(
+                    fields,
+                    outmap_fields["stream_specifier"],
+                    "video",
+                    inurl,
+                    inopts,
+                    input_info[ifile],
                 )
             )
-        except:
-            pass  # not probable, OK... maybe
-    s_in = (w_in, h_in) if w_in and h_in else None
+            inopt_vals = [v or s for v, s in zip(inopt_vals, st_vals)]
 
-    if outopts is None:
-        outopts = {}
-        args["outputs"][ofile] = (args["outputs"][ofile][0], outopts)
+        if has_simple_filter:
+
+            # create a source chain with matching spec and attach it to the af graph
+            r, pix_fmt, s = inopt_vals
+            vf = (
+                fgb.color(s=s, r=r)
+                + fgb.format(pix_fmts=pix_fmt)
+                + outopts.get("filter:v", outopts.get("vf", None))
+            )
+            outpad = next(vf.iter_output_pads(unlabeled_only=True), None)
+            if outpad is not None:
+                vf = vf >> "[out0]"
+            inopt_vals = flds2opts(
+                *utils.analyze_input_stream(
+                    fields,
+                    "0",
+                    "video",
+                    vf,
+                    {"f": "lavfi"},
+                    {"src_type": "filtergraph"},
+                )
+            )
+
+    # assign the values to individual variables
+    r, pix_fmt, s = opt_vals
+    r_in, pix_fmt_in, s_in = inopt_vals
 
     # pixel format must be specified
-    pix_fmt = outopts.get("pix_fmt", None)
-    remove_alpha = False
     if pix_fmt is None:
         # deduce output pixel format from the input pixel format
         try:
@@ -318,24 +371,18 @@ def finalize_video_read_opts(
                 dtype, ncomp = utils.get_pixel_format(pix_fmt)
             except:
                 ncomp = dtype = None
-            remove_alpha = False
         else:
             _, ncomp, dtype, remove_alpha = utils.get_pixel_config(pix_fmt_in, pix_fmt)
+            if remove_alpha:
+                # append the remove-video-alpha filter chain
+                build_basic_vf(args, True, ofile)
 
-    # set up basic video filter if specified
-    build_basic_vf(args, remove_alpha, ofile)
 
     outopts["f"] = "rawvideo"
 
-    # if no filter and video shape and rate are known, all known
-    r = s = None
-    if not has_filtergraph(args, "video") and ncomp is not None:
-        r = outopts.get("r", r_in)
-        s = outopts.get("s", s_in)
-        if s is not None:
-            if isinstance(s, str):
-                m = re.match(r"(\d+)x(\d+)", s)
-                s = [int(m[1]), int(m[2])]
+    # use output option value or else use the input value
+    r = r or r_in
+    s = s or s_in
 
     return dtype, None if s is None else (*s[::-1], ncomp), r
 

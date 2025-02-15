@@ -222,15 +222,24 @@ class SimpleVideoReader(SimpleReaderBase):
     def _finalize(self, ffmpeg_args):
         # finalize FFmpeg arguments and output array
 
-        inurl, inopts = ffmpeg_args.get("inputs", [])[0]
+        inopts = ffmpeg_args.get("inputs", [])[0][1]
         outopts = ffmpeg_args.get("outputs", [])[0][1]
-        has_fg = configure.has_filtergraph(ffmpeg_args, "video")
 
+        outopts["map"] = "0:v:0"
         (
             self.dtype,
             self.shape,
             self.rate,
-        ) = configure.finalize_video_read_opts(ffmpeg_args, istream="v:0")
+        ) = configure.finalize_video_read_opts(
+            ffmpeg_args,
+            input_info=[
+                {
+                    "src_type": (
+                        "filtergraph" if outopts.get("f", None) == "lavfi" else "url"
+                    )
+                }
+            ],
+        )
 
         pix_fmt = outopts.get("pix_fmt", None)
         pix_fmt_in = inopts.get("pix_fmt", None)
