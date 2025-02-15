@@ -1179,10 +1179,6 @@ def retrieve_input_stream_ids(
              or in an ffprobe incompatible format, e.g., ffconcat)
     """
 
-    src_type = info["src_type"]
-    if src_type == "filtergraph":
-        return utils.analyze_input_filtergraph_ids(url)
-
     # file/network input - process only if seekable
     # get ffprobe subprocess keywords
     url, sp_kwargs, exit_fcn = set_sp_kwargs_stdin(url, info)
