@@ -4,7 +4,7 @@ from itertools import islice
 
 from .typing import PAD_INDEX, JOIN_HOW, Literal, get_args
 
-from .exceptions import FiltergraphInvalidExpression
+from .exceptions import FiltergraphInvalidExpression, FFmpegioError
 from .. import filtergraph as fgb
 
 from .._utils import zip  # pre-py310 compatibility
@@ -175,9 +175,11 @@ def join(
     right = fgb.as_filtergraph_object(right, copy=not inplace)
 
     # handle joining empty graph
-    if not right.get_num_chains():
+    nright = right.get_num_chains()
+    if not nright:
         return left
-    if not left.get_num_chains():
+    nleft = left.get_num_chains()
+    if not nleft:
         return right
 
     iter_kws = {"unlabeled_only": unlabeled_only, "full_pad_index": True}
@@ -187,46 +189,37 @@ def join(
     if n_links == "all" or n_links < 0:
         n_links = 0
 
-    def create_links(it_left, it_right):
-        if n_links:
-            it_left = islice(it_left, n_links)
-            it_right = islice(it_right, n_links)
-
-        it_left = (v[0] for v in it_left)
-        it_right = (v[0] for v in it_right)
-
+    if how in ("per_chain", "auto") and nright == nleft:
+        #
         try:
-            return list(zip([*it_left], [*it_right], strict=strict))
-        except ValueError:
-            raise ValueError(
-                f"Available pads of left and right filtergraph objects do not match ({strict=})"
-            )
-
-    if how in ("per_chain", "auto"):
-        it_left_chain = left.iter_chains(skip_if_no_output=True)
-        it_right_chain = right.iter_chains(skip_if_no_input=True)
-        try:
-            chain_pairs = zip(
-                [*it_left_chain], [*it_right_chain], strict=strict or how == "auto"
-            )
-            links = [
-                ((il, *l[1:]), (ir, *r[1:]))  # output -> input
-                for (il, lchain), (ir, rchain) in chain_pairs
-                for (l, r) in create_links(
-                    lchain.iter_output_pads(**iter_kws),
-                    rchain.iter_input_pads(**iter_kws),
-                )
-            ]
+            links = [None] * nleft
+            for c in range(nleft):
+                # get the first available pad to join
+                left_pad, *_ = next(left.iter_output_pads(chain=c, **iter_kws))
+                right_pad, *_ = next(right.iter_input_pads(chain=c, **iter_kws))
+                links[c] = (left_pad, right_pad)
         except:
             if how == "auto":
                 how = "all"
             else:
                 raise
 
-    if how in ("all", "chanable"):
-        links = create_links(
-            left.iter_output_pads(**iter_kws), right.iter_input_pads(**iter_kws)
-        )
+    if how in ("all", "chainable") or nright != nleft:
+
+        left_pads = [out[0] for out in left.iter_output_pads(**iter_kws)]
+        right_pads = [out[0] for out in right.iter_input_pads(**iter_kws)]
+
+        nleft, nright = len(left_pads), len(right_pads)
+        if strict and nleft != nright:
+            raise FFmpegioError("`[stict=True] number of unconnected pads must match.")
+        n_max = min(nleft, nright)
+        n_links = n_max if n_links <= 0 else min(n_links, n_max)
+
+        links = [None] * n_links
+        for i, (left_pad, right_pad) in enumerate(
+            zip(left_pads[:n_links], right_pads[:n_links])
+        ):
+            links[i] = (left_pad, right_pad)
 
     fg = left._connect(
         right,
