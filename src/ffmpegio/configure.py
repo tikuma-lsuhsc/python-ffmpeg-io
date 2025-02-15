@@ -13,10 +13,9 @@ from ._typing import (
     Buffer,
     InputSourceDict,
 )
-from collections.abc import Sequence, Callable
+from collections.abc import Sequence
 
 from fractions import Fraction
-
 import re, logging
 
 logger = logging.getLogger("ffmpegio")
@@ -25,6 +24,7 @@ from io import IOBase
 
 from namedpipe import NPopen
 
+from . import utils, probe
 from . import filtergraph as fgb
 from .filtergraph.abc import FilterGraphObject
 from .filtergraph.presets import merge_audio, filter_video_basic, remove_video_alpha
@@ -36,6 +36,7 @@ from .stream_spec import (
     stream_type_to_media_type,
     parse_map_option,
 )
+from .errors import FFmpegioError
 
 #################################
 ## module types
@@ -929,6 +930,7 @@ def add_filtergraph(
                 else [existing_map, *map]
             )
 
+        outopts["map"] = map
 
 
 def resolve_raw_output_streams(
