@@ -295,7 +295,7 @@ class Graph(fgb.abc.FilterGraphObject, UserList):
         pos.append(len(expr))
 
         prefix = "      chain"
-        nzeros = floor(log10(nchains)) + 1
+        nzeros = floor(log10(nchains)) + 1 if nchains else 0
         fmt = f"0{nzeros}"
         chain_list = [
             f"{prefix}[{j:{fmt}}]: {expr[i0:i1]}"
