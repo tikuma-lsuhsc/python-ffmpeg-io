@@ -48,4 +48,5 @@ class InputSourceDict(TypedDict):
     src_type: FFmpegInputType  # True if file path/url
     buffer: NotRequired[bytes]  # index of the source index
     fileobj: NotRequired[IO]  # file object
+    media_type: NotRequired[MediaType]  # media type if input pipe
     pipe: NotRequired[NPopen]  # pipe

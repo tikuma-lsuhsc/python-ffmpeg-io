@@ -49,7 +49,7 @@ from .errors import FFmpegioError
 
 UrlType = Literal["input", "output"]
 
-FFmpegOutputType = Literal["url", "fileobj"]
+FFmpegOutputType = Literal["url", "fileobj", "pipe"]
 
 FFmpegInputUrlComposite = Union[FFmpegUrlType, FFConcat, FilterGraphObject, IO, Buffer]
 FFmpegOutputUrlComposite = Union[FFmpegUrlType, IO]
@@ -1224,6 +1224,87 @@ def process_url_inputs(
         add_url(args, "input", *url_opts)
 
     return input_info_list
+
+
+def process_raw_outputs(
+    args: FFmpegArgs,
+    input_info: list[InputSourceDict],
+    streams: Sequence[str] | dict[str, dict[str, Any] | None] | None,
+    options: dict[str, Any],
+) -> list[RawOutputInfoDict]:
+    """analyze and process piped raw outputs
+
+    :param args: FFmpeg argument dict, A new item in`args['outputs']` is
+                 appended for each piped output. Output URLs are left `None`.
+    :param input_info: list of input information (same length as `args['inputs'])
+    :param streams: user's list of map options to be included
+    :param options: default output options
+    :return: list of output information
+    """
+
+    # resolve requested output streams
+    stream_info: dict[str, RawOutputInfoDict] = (
+        auto_map(args, input_info)  # automatically map all the streams
+        if streams is None or len(streams) == 0
+        else resolve_raw_output_streams(args, input_info, streams)
+    )
+
+    # add outputs to FFmpeg arguments
+    get_opts = isinstance(streams, dict)
+    for spec, info in stream_info.items():
+        opts = (
+            {**options, **streams[info["user_map"]], "map": spec}
+            if get_opts
+            else {**options, "map": spec}
+        )
+        add_url(args, "output", None, opts)
+
+    # finalize each output streams and identify the output formats
+    for i, (_, info) in enumerate(stream_info.items()):
+        # append media_info key to the output info dict
+        info["media_info"] = (
+            finalize_audio_read_opts
+            if info["media_type"] == "audio"
+            else finalize_video_read_opts
+        )(args, i, input_info)
+
+    return list(stream_info.values())
+
+
+def process_raw_inputs(
+    args: FFmpegArgs,
+    input_opts: list[dict],
+    inopts_default: dict[str, Any],
+) -> list[InputSourceDict]:
+    # add input streams
+    input_info = []
+    for opts in input_opts:
+        add_url(args, "input", None, {**inopts_default, **opts})
+        input_info.append(
+            {"src_type": "pipe", "media_type": "audio" if "ar" in opts else "video"}
+        )
+
+    return input_info
+
+
+def assign_input_url(args: FFmpegArgs, ifile: int, url: str):
+    """assign a new url to an FFmpeg input
+
+    :param args: FFmpeg arguments (args['inputs'][ifile] to be modified)
+    :param ifile: file index
+    :param url: new url
+    """
+    args["inputs"][ifile] = (url, args["inputs"][ifile][1])
+
+
+def assign_output_url(args: FFmpegArgs, ofile: int, url: str):
+    """assign a new url to an FFmpeg output
+
+    :param args: FFmpeg arguments (args['outputs'][ofile] to be modified)
+    :param ofile: file index
+    :param url: new url
+    """
+    args["outputs"][ofile] = (url, args["outputs"][ofile][1])
 
 
 def retrieve_input_stream_ids(
