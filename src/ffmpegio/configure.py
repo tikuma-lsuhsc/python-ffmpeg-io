@@ -341,7 +341,7 @@ def finalize_video_read_opts(
         if has_simple_filter:
 
             # create a source chain with matching spec and attach it to the af graph
-            vf = temp_video_src(outopts, *inopt_vals) + outopts.get(
+            vf = temp_video_src(*inopt_vals) + outopts.get(
                 "filter:v", outopts.get("vf", None)
             )
 
@@ -964,7 +964,7 @@ def resolve_raw_output_streams(
     # check if stream specifiers single out mapping one input stream per output
     if all(
         (opt["stream_specifier"].get("stream_type", None) or "") in "avV"
-        and "stream_id" in opt["stream_specifier"]
+        and "index" in opt["stream_specifier"]
         for opt in map_options
     ):
         # no need to run the stream mapping analysis
