@@ -44,6 +44,7 @@ from .stream_spec import (
     map_option as compose_map_option,
 )
 from .errors import FFmpegioError
+from .threading import ReaderThread
 
 #################################
 ## module types
@@ -73,10 +74,11 @@ class RawOutputInfoDict(TypedDict):
     dst_type: FFmpegOutputType  # True if file path/url
     user_map: str | None  # user specified map option
     media_type: MediaType | None  #
-    input_id: NotRequired[int | None]
+    input_file_id: NotRequired[int | None]
     input_stream_id: NotRequired[int | None]
     media_info: NotRequired[dict[str, Any]]
     pipe: NotRequired[NPopen]
+    reader: NotRequired[ReaderThread]
 
 
 #################################
