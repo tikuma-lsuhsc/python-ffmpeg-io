@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger("ffmpegio")
+
 from collections.abc import Sequence
 from ._typing import (
     Literal,
@@ -19,13 +23,12 @@ from fractions import Fraction
 from namedpipe import NPopen
 
 from .threading import WriterThread
-from .filtergraph.presets import merge_audio
 
 from . import ffmpegprocess, utils, configure, FFmpegError, plugins, filtergraph as fgb
 from .utils import avi, pop_global_options
 from .utils.log import extract_output_stream
-from .threading import WriterThread, ReaderThread
-from .probe import streams_basic
+from .threading import WriterThread, ReaderThread, CopyFileObjThread
+from .errors import FFmpegioError
 
 __all__ = ["read", "write"]
 
@@ -69,26 +72,37 @@ def read(
     args, input_info, output_info = configure.init_media_read(urls, map, options)
 
     # True if there is unknown datablob info
-    need_stderr = any(info["media_info"] is None for info in output_info.values())
+    need_stderr = any(info["media_info"] is None for info in output_info)
 
     # run FFmpeg
     capture_log = True if need_stderr else None if show_log else True
 
     with contextlib.ExitStack() as stack:
 
+        # configure input pipes (if needed)
+        for i, (input, info) in enumerate(zip(args["inputs"], input_info)):
+            if input[0] is None:  # no url == fileobj / buffer / other data via a pipe
+                pipe = NPopen("w", bufsize=0)
+                stack.enter_context(pipe)
+                configure.assign_input_url(args, i, pipe.path)
+                src_type = info["src_type"]
+                if src_type == "fileobj":
+                    writer = CopyFileObjThread(info["fileobj"], pipe, auto_close=True)
+                elif src_type == "buffer":
+                    writer = WriterThread()
+                    writer.write(info["buffer"])
+                    writer.write(None)  # close the
+                else:
+                    raise FFmpegioError(f"{src_type=} is an unknown input data type.")
+                stack.enter_context(writer)  # starts thread & wait for pipe connection
+
         # configure output pipes
-        outputs = args["outputs"]
-        nouts = len(outputs)
-        pipes = [None] * nouts
-        for i in range(nouts):
+        for i, info in enumerate(output_info):
             pipe = NPopen("r", bufsize=0)
             stack.enter_context(pipe)
-            pipes[i] = pipe
-
-        # connect the pipes and queue the stream data
-        for info in output_info:
-            info["reader"] = reader = ReaderThread(info["pipe"])
-            stack.enter_context(reader)
+            configure.assign_output_url(args, i, pipe.path)
+            info["reader"] = reader = ReaderThread(pipe)
+            stack.enter_context(reader)  # starts thread & wait for pipe connection
 
         # run the FFmpeg
         proc = ffmpegprocess.Popen(
@@ -102,17 +116,26 @@ def read(
         if proc.returncode:
             raise FFmpegError(proc.stderr, capture_log)
 
+        # wind-down the readers
+        for info in output_info:
+            info['reader'].cool_down()
+
         # gather output
         rates = {}
         data = {}
         for i, info in enumerate(output_info):
-            spec = info["stream_spec"]
+            spec = (
+                info["user_map"] or f"{info['input_file_id']}:{info['input_stream_id']}"
+            )
             b = info["reader"].read_all()
 
             # get datablob info from stderr if needed
             missing = any(v is None for v in info["media_info"])
 
             if missing:
+                logger.warning(
+                    'Retrieving stream "%s" information from FFmpeg log.', spec
+                )
                 new_info = extract_output_stream(proc.stderr, i)
 
             if info["media_type"] == "video":
@@ -120,29 +143,29 @@ def read(
 
                 if missing:
                     if dtype is None:
-                        pix_fmt = new_info.get("pix_fmt", None)
+                        pix_fmt = new_info["pix_fmt"]
                         dtype = utils.get_pixel_format(pix_fmt)[0]
                     if shape is None:
-                        shape = new_info.get("s", None)
+                        shape = new_info["s"]
                     if rate is None:
-                        rate = new_info.get("r", None)
+                        rate = new_info["r"]
 
                 data[spec] = plugins.get_hook().bytes_to_video(
                     b=b, dtype=dtype, shape=shape, squeeze=False
                 )
             else:  # 'audio'
-                dtype, ac, rate = info["media_info"]
+                dtype, shape, rate = info["media_info"]
                 if missing:
                     if dtype is None:
-                        sample_fmt = new_info.get("sample_fmt", None)
+                        sample_fmt = new_info["sample_fmt"]
                         dtype = utils.get_audio_format(sample_fmt)
-                    if ac is None:
-                        ac = new_info.get("ac", None)
+                    if shape is None:
+                        shape = (new_info["ac"],)
                     if rate is None:
-                        rate = new_info.get("ar", None)
+                        rate = new_info["ar"]
 
                 data[spec] = plugins.get_hook().bytes_to_audio(
-                    b=b, dtype=dtype, shape=(ac,), squeeze=False
+                    b=b, dtype=dtype, shape=shape, squeeze=False
                 )
             rates[spec] = rate
 
