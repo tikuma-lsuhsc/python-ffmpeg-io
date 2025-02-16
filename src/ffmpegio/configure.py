@@ -1358,37 +1358,237 @@ def retrieve_input_stream_ids(
     return stream_ids
 
 
+def finalize_media_read_opts(args: FFmpegArgs, out_idx: int) -> tuple[MediaType, tuple]:
+    """finalize an output pipe for reading an audio/video stream
 
-def set_sp_kwargs_stdin(
-    url: str | None, info: InputSourceDict, sp_kwargs: dict = {}
-) -> tuple[str, dict | None, Callable]:
-    """configure sp_kwargs for ffprobe/ffmpeg call to pipe-in the data via stdin
-
-    :param url: input URL
-    :param info: input info
-    :param sp_kwargs: initial sp_kwargs keyword options
-    :return: tuple of url (or "pipe:0" if stdin data), updated sp_kwargs, and cleanup function
+    :param args: FFmpeg argument dict
+    :param out_idx: output url index to finalize
+    :return: a tuple of the media type of the output stream and its data blob info
     """
 
-    # ffprobe subprocess keywords
-    src_type = info["src_type"]
-    exit_fcn = lambda: None
+    inputs = args["inputs"]
+    out_url, out_opts = args["outputs"][out_idx]
+    gopts = args["global_options"] or {}
 
-    if src_type != "url":
-        url = "pipe:0"
-        if src_type == "buffer":
-            sp_kwargs = {**sp_kwargs, "input": info["buffer"]}
-        elif src_type == "fileobj":
-            f = info["fileobj"]
-            if f.readable() and f.seekable():
-                sp_kwargs = {**sp_kwargs, "stdin": f}
-                pos = f.tell()
-                exit_fcn = lambda: f.seek(pos)  # restore the read cursor position
-            else:
-                logger.warning("file object must be seekable.")
-                sp_kwargs = None
+    # resolve the stream mapping
+    if "map" in out_opts:
+        map = out_opts["map"]
+        if not isinstance(map, str):
+            if len(map) != 1:
+                raise ValueError(
+                    "Too many stream maps (or none listed). Only one map option is supported."
+                )
+            map = map[0]
+
+        # parse the map option value
+        map_d = parse_map_option(map, 0 if len(inputs) == 1 else None)
+    elif len(inputs) != 1:
+        raise ValueError(
+            "Too many files. Only one input file is supported per reader stream."
+        )
+    else:
+        map_d = {"input_id": 0}
+
+    # resolve the stream media type: 'audio' vs. 'video'
+    media_type = None
+    if "linklabel" in map_d:
+        if "filter_complex" not in gopts:
+            raise FFmpegError("`filter_complex` global option not found.")
+
+        fgs = [
+            fgb.as_filtergraph_object(fg)
+            for fg in as_multi_option(
+                gopts["filter_complex"], (str, fgb.Graph, fgb.Chain)
+            )
+        ]
+        linklabel = map_d["linklabel"]
+
+        # get the output filter for the media type
+        for fg in fgs:
+            try:
+                pad_index = fg.get_output_pad(linklabel)
+                media_type = fg[*pad_index[:-1]].get_pad_media_type(
+                    "output", pad_index[-1]
+                )
+                # traverse back the chain to look for stream formats
+                break
+            except fgb.FiltergraphPadNotFoundError:
+                pass
+    else:
+        # get the input stream media type
+        input_id = map_d["input_id"]
+        in_url, in_opts = inputs[input_id]
+        stream_spec = map_d.get("stream_specifier", None)
+        st_info = probe.streams_basic(in_url, stream_spec=stream_spec)
+        if len(st_info) != 1:
+            raise ValueError(
+                "Too many streams (or none found). Only one input stream is supported."
+            )
+        media_type = st_info[0]["codec_type"]
+        if in_opts is None:
+            in_opts = {}
+
+        media_info = (
+            finalize_audio_read_opts(args, out_idx, input_id, stream_spec)
+            if media_type == "audio"
+            else finalize_video_read_opts(args, out_idx, input_id, stream_spec)
+        )
+
+    return media_type, media_info
+
+
+def init_media_read(
+    urls: FFmpegInputUrlComposite,
+    map: Sequence[str] | dict[str, dict[str, Any] | None] | None,
+    options: dict[str, Any],
+) -> tuple[FFmpegArgs, list[InputSourceDict], list[RawOutputInfoDict]]:
+    """Initialize FFmpeg arguments for media read
+
+    :param *urls: URLs of the media files to read.
+    :param map: output stream mappings:
+                - `None` to include all input streams OR all filtergraph outputs
+                - a sequence of str to specify stream specifiers with file id's
+                - a dict with stream specifier keys to specify output options
+    :param **options: FFmpeg options, append '_in[input_url_id]' for input option names for specific
+                        input url or '_in' to be applied to all inputs. The url-specific option gets the
+                        preference (see :doc:`options` for custom options)
+    :return: frame/sampling rates and raw data for each requested stream
+
+    Note: Only pass in multiple urls to implement complex filtergraph. It's significantly faster to run
+          `ffmpegio.video.read()` for each url.
+
+    Specify the streams to return by `map` output option:
+
+        map = ['0:v:0','1:a:3'] # pick 1st file's 1st video stream and 2nd file's 4th audio stream
+
+    Unlike :py:mod:`video` and :py:mod:`image`, video pixel formats are not autodetected. If output
+    'pix_fmt' option is not explicitly set, 'rgb24' is used.
+
+    For audio streams, if 'sample_fmt' output option is not specified, 's16'.
+    """
+
+    ninputs = len(urls)
+    if not ninputs:
+        raise ValueError("At least one URL must be given.")
+
+    if "n" in options:
+        raise ValueError("Cannot have an `n` option set to output to named pipes.")
+
+    # separate the options
+    inopts_default = utils.pop_extra_options(options, "_in")
+
+    # create a new FFmpeg dict
+    args = empty(utils.pop_global_options(options))
+    gopts = args["global_options"]  # global options dict
+    gopts["y"] = None
+
+    if "filter_complex" in gopts:
+        gopts["filter_complex"] = utils.as_multi_option(
+            gopts["filter_complex"], (str, FilterGraphObject)
+        )
+
+    # analyze and assign inputs
+    input_info = process_url_inputs(args, urls, inopts_default)
+
+    # analyze and assign outputs
+    output_info = process_raw_outputs(args, input_info, map, options)
+
+    return args, input_info, output_info
+
+
+def init_media_write(
+    url: FFmpegOutputUrlComposite,
+    input_opts: list[dict],
+    merge_audio_streams: bool | Sequence[int],
+    merge_audio_ar: int | None,
+    merge_audio_sample_fmt: str | None,
+    merge_audio_outpad: str | None,
+    extra_inputs: Sequence[str | tuple[str, dict]] | None,
+    options: dict[str, Any],
+) -> tuple[FFmpegArgs, list[NPopen], bytes | None]:
+    """write multiple streams to a url/file
+
+    :param url: output url
+    :param input_opts: list of input option dict must include `'ar'` (audio) or `'r'` (video) to specify the rate.
+    :param merge_audio_streams: True to combine all input audio streams as a single multi-channel stream. Specify a list of the input stream id's
+                                (indices of `stream_types`) to combine only specified streams.
+    :param merge_audio_ar: Sampling rate of the merged audio stream in samples/second, defaults to None to use the sampling rate of the first merging stream
+    :param merge_audio_sample_fmt: Sample format of the merged audio stream, defaults to None to use the sample format of the first merging stream
+    :param extra_inputs: list of additional input sources, defaults to None. Each source may be url
+                         string or a pair of a url string and an option dict.
+    :param **options: FFmpeg options, append '_in' for input option names (see :doc:`options`). Input options
+                      will be applied to all input streams unless the option has been already defined in `stream_data`
+
+    TIPS
+    ----
+
+    * All the input streams will be added to the output file by default, unless `map` option is specified
+    * If the input streams are of different durations, use `shortest=ffmpegio.FLAG` option to trim all streams to the shortest.
+    * Using merge_audio_streams:
+      - adds a `filter_complex` global option
+      - merged input streams are removed from the `map` option and replaced by the merged stream
+
+    """
+
+    # analyze input stream_data
+    n_in = len(input_opts)
+
+    # separate the input options from the rest of the options
+    default_in_opts = utils.pop_extra_options(options, "_in")
+
+    # create FFmpeg argument dict
+    ffmpeg_args = empty()
+
+    # add input streams
+    pipes = []  # named pipes and their data blobs (one for each input stream)
+    n_ain = 0
+    for opts in input_opts:
+        pipe = NPopen("w", bufsize=0)
+        add_url(ffmpeg_args, "input", pipe.path, {**default_in_opts, **opts})
+        pipes.append(pipe)
+        if "ar" in opts:
+            n_ain += 1
+
+    # map all input streams to output unless user specifies the mapping
+    map = options["map"] if "map" in options else list(range(n_in))
+    do_merge = bool(merge_audio_streams) and n_ain > 1
+    if do_merge:
+        if merge_audio_streams is True:
+            # if True, convert to stream indices of audio inputs
+            merge_audio_streams = [
+                i for i, opts in enumerate(input_opts) if "ar" in opts
+            ]
         else:
-            logger.warning("unknown input source type.")
-            sp_kwargs = None
+            try:
+                assert all("ar" in input_opts[i] for i in merge_audio_streams)
+            except AssertionError:
+                raise ValueError(
+                    "merge_audio_streams argument must be bool or a sequence of indices of input audio streams."
+                )
 
-    return url, sp_kwargs, exit_fcn
+        # assign the final map - exclude audio streams if to be merged together
+        options["map"] = [i for i in map if i not in merge_audio_streams]
+
+    # add output url and options (may also contain possibly global options)
+    add_url(ffmpeg_args, "output", url, options)
+
+    # add extra input arguments if given
+    if extra_inputs is not None:
+        add_urls(ffmpeg_args, "input", extra_inputs)
+
+    if do_merge:
+
+        # get FFmpeg input list
+        ffinputs = ffmpeg_args["inputs"]
+        audio_streams = {i: ffinputs[i][1] for i in merge_audio_streams}
+        afilt = merge_audio(
+            audio_streams,
+            merge_audio_ar,
+            merge_audio_sample_fmt,
+            merge_audio_outpad or "aout",
+        )
+
+        # add the merging filter graph to the filter_complex argument
+        add_filtergraph(ffmpeg_args, afilt)
+
+    return ffmpeg_args, pipes

@@ -18,6 +18,8 @@ from .._utils import *
 from ..stream_spec import *
 from ..errors import FFmpegError, FFmpegioError
 from .._typing import Any, MediaType, InputSourceDict
+from ..filtergraph.abc import FilterGraphObject
+from .. import filtergraph as fgb
 
 # TODO: auto-detect endianness
 # import sys
@@ -552,6 +554,55 @@ def analyze_input_stream(
     :raises NotImplementedError: _description_
     :return values of the requested fields of the stream
     """
+
+    fields = [*fields, "codec_type"]
+    input_url, sp_kwargs, exit_fcn = set_sp_kwargs_stdin(input_url, input_info)
+    try:
+        q = probe.query(
+            input_url,
+            stream,
+            fields,
+            keep_optional_fields=True,
+            keep_str_values=False,
+            cache_output=True,
+            sp_kwargs=sp_kwargs,
+            f=input_opts.get("f", None),
+        )
+    except FFmpegError:
+        # no change
+        return [None] * (len(fields) - 1)
+    else:
+        q = [i for i in q if i["codec_type"] == media_type]
+        if len(q) != 1:
+            raise FFmpegioError(
+                f"Specified {stream=} must resolve to one and only one {media_type} stream."
+            )
+    finally:
+        # rewind fileobj if possible
+        exit_fcn()
+
+    q = q[0]
+    return [q.get(f, None) for f in fields[:-1]]
+
+
+def analyze_complex_filtergraphs(
+    filtergraphs: list[FilterGraphObject],
+    inputs: list[tuple[str | None, dict]],
+    inputs_info: list[InputSourceDict],
+    fields: list[str] | None = None,
+) -> list:
+    """analyze filtergraphs and return requested field values
+
+    :param fields: a list of stream properties
+    :param stream: stream specifier, first one is returned if it yields more than one stream,
+    :param input_url: url or None if piped or fileobj
+    :param input_opts: input options
+    :param input_info: input infomration
+    :raises NotImplementedError: _description_
+    :return values of the requested fields of the stream
+    """
+
+    fg = fgb.stack(filtergraphs)
 
     fields = [*fields, "codec_type"]
     input_url, sp_kwargs, exit_fcn = set_sp_kwargs_stdin(input_url, input_info)

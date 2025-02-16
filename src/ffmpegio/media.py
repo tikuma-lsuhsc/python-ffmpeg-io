@@ -8,6 +8,7 @@ from ._typing import (
     ProgressCallable,
     RawDataBlob,
     Unpack,
+    FFmpegUrlType,
 )
 from .stream_spec import StreamSpecDict
 
@@ -20,11 +21,132 @@ from namedpipe import NPopen
 from .threading import WriterThread
 from .filtergraph.presets import merge_audio
 
-from . import ffmpegprocess, utils, configure, FFmpegError, plugins
-from .utils import avi
-from .threading import WriterThread
+from . import ffmpegprocess, utils, configure, FFmpegError, plugins, filtergraph as fgb
+from .utils import avi, pop_global_options
+from .utils.log import extract_output_stream
+from .threading import WriterThread, ReaderThread
+from .probe import streams_basic
 
 __all__ = ["read", "write"]
+
+
+def read(
+    *urls: * tuple[FFmpegUrlType | tuple[FFmpegUrlType, dict[str, Any] | None]],
+    map: Sequence[str] | dict[str, dict[str, Any] | None] | None = None,
+    progress: ProgressCallable | None = None,
+    show_log: bool | None = None,
+    sp_kwargs: dict | None = None,
+    **options: Unpack[dict[str, Any]],
+) -> tuple[dict[str, Fraction | int], dict[str, RawDataBlob]]:
+    """Read video and audio data from multiple media files
+
+    :param *urls: URLs of the media files to read or a tuple of the URL and its input option dict.
+    :param map: FFmpeg map options
+    :param progress: progress callback function, defaults to None
+    :param show_log: True to show FFmpeg log messages on the console,
+                     defaults to None (no show/capture)
+                     Ignored if stream format must be retrieved automatically.
+    :param use_ya: True if piped video streams uses `ya8` pix_fmt instead of `gray16le`, default to None
+    :param **options: FFmpeg options, append '_in[input_url_id]' for input option names for specific
+                        input url or '_in' to be applied to all inputs. The url-specific option gets the
+                        preference (see :doc:`options` for custom options)
+    :return: frame/sampling rates and raw data for each requested stream
+
+    Note: Only pass in multiple urls to implement complex filtergraph. It's significantly faster to run
+          `ffmpegio.video.read()` for each url.
+
+    Specify the streams to return by `map` output option:
+
+        map = ['0:v:0','1:a:3'] # pick 1st file's 1st video stream and 2nd file's 4th audio stream
+
+    Unlike :py:mod:`video` and :py:mod:`image`, video pixel formats are not autodetected. If output
+    'pix_fmt' option is not explicitly set, 'rgb24' is used.
+
+    For audio streams, if 'sample_fmt' output option is not specified, 's16'.
+    """
+
+    # initialize FFmpeg argument dict and get input & output information
+    args, input_info, output_info = configure.init_media_read(urls, map, options)
+
+    # True if there is unknown datablob info
+    need_stderr = any(info["media_info"] is None for info in output_info.values())
+
+    # run FFmpeg
+    capture_log = True if need_stderr else None if show_log else True
+
+    with contextlib.ExitStack() as stack:
+
+        # configure output pipes
+        outputs = args["outputs"]
+        nouts = len(outputs)
+        pipes = [None] * nouts
+        for i in range(nouts):
+            pipe = NPopen("r", bufsize=0)
+            stack.enter_context(pipe)
+            pipes[i] = pipe
+
+        # connect the pipes and queue the stream data
+        for info in output_info:
+            info["reader"] = reader = ReaderThread(info["pipe"])
+            stack.enter_context(reader)
+
+        # run the FFmpeg
+        proc = ffmpegprocess.Popen(
+            args, progress=progress, capture_log=capture_log, sp_kwargs=sp_kwargs
+        )
+
+        # wait for the FFmpeg to finish processing
+        proc.wait()
+
+        # throw error if failed
+        if proc.returncode:
+            raise FFmpegError(proc.stderr, capture_log)
+
+        # gather output
+        rates = {}
+        data = {}
+        for i, info in enumerate(output_info):
+            spec = info["stream_spec"]
+            b = info["reader"].read_all()
+
+            # get datablob info from stderr if needed
+            missing = any(v is None for v in info["media_info"])
+
+            if missing:
+                new_info = extract_output_stream(proc.stderr, i)
+
+            if info["media_type"] == "video":
+                dtype, shape, rate = info["media_info"]
+
+                if missing:
+                    if dtype is None:
+                        pix_fmt = new_info.get("pix_fmt", None)
+                        dtype = utils.get_pixel_format(pix_fmt)[0]
+                    if shape is None:
+                        shape = new_info.get("s", None)
+                    if rate is None:
+                        rate = new_info.get("r", None)
+
+                data[spec] = plugins.get_hook().bytes_to_video(
+                    b=b, dtype=dtype, shape=shape, squeeze=False
+                )
+            else:  # 'audio'
+                dtype, ac, rate = info["media_info"]
+                if missing:
+                    if dtype is None:
+                        sample_fmt = new_info.get("sample_fmt", None)
+                        dtype = utils.get_audio_format(sample_fmt)
+                    if ac is None:
+                        ac = new_info.get("ac", None)
+                    if rate is None:
+                        rate = new_info.get("ar", None)
+
+                data[spec] = plugins.get_hook().bytes_to_audio(
+                    b=b, dtype=dtype, shape=(ac,), squeeze=False
+                )
+            rates[spec] = rate
+
+    return rates, data
 
 
 def read_by_avi(
@@ -157,6 +279,8 @@ def write(
 
     """
 
+    url, stdout, _ = configure.check_url(url, True)
+
     if not all(t in "av" for t in stream_types):
         raise ValueError("Elements of stream_types input must either 'a' or 'v'.")
 
@@ -166,16 +290,8 @@ def write(
     if len(stream_args) != n_in:
         raise ValueError(f"Lengths of `stream_args` and `stream_types` not matching.")
 
-    # separate the input options from the rest of the options
-    default_in_opts = utils.pop_extra_options(options, "_in")
-
-    url, stdout, _ = configure.check_url(url, True)
-
-    # create FFmpeg argument dict
-    ffmpeg_args = configure.empty()
-
-    # add input streams
-    pipes = []  # named pipes and their data blobs (one for each input stream)
+    input_opts = []
+    input_byte_data = []
 
     for mtype, arg in zip(stream_types, stream_args):
 
@@ -194,77 +310,28 @@ def write(
                 """
             )
 
-        pipe = NPopen("w", bufsize=0)
-
         if mtype == "a":  # audio
             if not isinstance(opts, dict):
                 opts = {"ar": round(opts)}
-            elif "ar" not in opts:
-                raise ValueError(
-                    "audio stream option dict missing the required 'ar' item to set the sampling rate."
-                )
-            in_args = configure.array_to_audio_input(
-                pipe_id=pipe.path, data=data, **{**default_in_opts, **opts}
-            )
-            byte_data = plugins.get_hook().audio_bytes(obj=data)
+            input_opts.append({**opts, **utils.array_to_audio_options(data)})
+            input_byte_data.append(plugins.get_hook().audio_bytes(obj=data))
 
         else:  # video
             if not isinstance(opts, dict):
                 opts = {"r": opts}
-            elif "r" not in opts:
-                raise ValueError(
-                    "video stream option dict missing the required 'r' item to set the frame rate."
-                )
-            in_args = configure.array_to_video_input(
-                pipe_id=pipe.path, data=data, **{**default_in_opts, **opts}
-            )
-            byte_data = plugins.get_hook().video_bytes(obj=data)
+            input_opts.append({**opts, **utils.array_to_video_options(data)})
+            input_byte_data.append(plugins.get_hook().video_bytes(obj=data))
 
-        pipes.append((pipe, byte_data))
-
-        configure.add_url(ffmpeg_args, "input", *in_args)
-
-    # map all input streams to output unless user specifies the mapping
-    map = options["map"] if "map" in options else list(range(n_in))
-    do_merge = bool(merge_audio_streams) and stream_types.count("a") > 1
-    if do_merge:
-        if merge_audio_streams is True:
-            # if True, convert to stream indices of audio inputs
-            merge_audio_streams = [
-                i for i, mtype in enumerate(stream_types) if mtype == "a"
-            ]
-        else:
-            try:
-                assert all(stream_types[i] == "a" for i in merge_audio_streams)
-            except AssertionError:
-                raise ValueError(
-                    "merge_audio_streams argument must be bool or a sequence of indices of input audio streams."
-                )
-
-        # assign the final map - exclude audio streams if to be merged together
-        options["map"] = [i for i in map if i not in merge_audio_streams]
-
-    # add output url and options (may also contain possibly global options)
-    configure.add_url(ffmpeg_args, "output", url, options)
-
-    # add extra input arguments if given
-    if extra_inputs is not None:
-        configure.add_urls(ffmpeg_args, "input", extra_inputs)
-
-    if do_merge:
-
-        # get FFmpeg input list
-        ffinputs = ffmpeg_args["inputs"]
-        audio_streams = {i: ffinputs[i][1] for i in merge_audio_streams}
-        afilt = merge_audio(
-            audio_streams,
-            merge_audio_ar,
-            merge_audio_sample_fmt,
-            merge_audio_outpad or "aout",
-        )
-
-        # add the merging filter graph to the filter_complex argument
-        configure.add_filtergraph(ffmpeg_args, afilt)
+    ffmpeg_args, pipes = configure.init_media_write(
+        url,
+        input_opts,
+        merge_audio_streams,
+        merge_audio_ar,
+        merge_audio_sample_fmt,
+        merge_audio_outpad,
+        extra_inputs,
+        options,
+    )
 
     kwargs = {**sp_kwargs} if sp_kwargs else {}
     kwargs.update(
@@ -281,7 +348,7 @@ def write(
         proc = ffmpegprocess.Popen(ffmpeg_args, **kwargs)
 
         # connect the pipes and queue the stream data
-        for p, data in pipes:
+        for p, data in zip(pipes, input_byte_data):
             stack.enter_context(p)
             writer = WriterThread(p)
             stack.enter_context(writer)

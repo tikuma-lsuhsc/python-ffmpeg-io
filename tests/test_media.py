@@ -9,10 +9,10 @@ def test_media_read():
     url = "tests/assets/testmulti-1m.mp4"
     url1 = "tests/assets/testvideo-1m.mp4"
     url2 = "tests/assets/testaudio-1m.mp3"
-    rates, data = ff.media.read(url, t=1)
-    rates, data = ff.media.read(url, map=("v:0", "v:1", "a:1", "a:0"), t=1)
-    rates, data = ff.media.read(url1, url2, t=1)
-    rates, data = ff.media.read(url2, url, map=("1:v:0", (0, "a:0")), t=1)
+    rates, data = ff.media.read(url, t=1, show_log=True)
+    rates, data = ff.media.read(url, map=("v:0", "v:1", "a:1", "a:0"), t=1, show_log=True)
+    rates, data = ff.media.read(url1, url2, t=1, show_log=True)
+    rates, data = ff.media.read(url2, url, map=("1:v:0", (0, "a:0")), t=1, show_log=True)
 
     print(rates)
     print([(k, x["shape"], x["dtype"]) for k, x in data.items()])

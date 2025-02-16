@@ -369,6 +369,53 @@ class ReaderThread(Thread):
 
         logger.info("ReaderThread exiting")
 
+    def read_nowait(self, n: int = -1) -> bytes:
+        # wait till matching line is read by the thread
+        block = (self.is_alive() and self._collect) and n != 0
+        if timeout is not None:
+            timeout = time() + timeout
+
+        arrays = []
+        n_new = max(n, -n)
+
+        # grab any leftover data from previous read
+        if self._carryover:
+            arrays = [self._carryover]
+            if n_new != 0:
+                n_new -= len(self._carryover) // self.itemsize
+            self._carryover = None
+
+        # loop till enough data are collected
+        nreads = 1 if n <= 0 else max(n_new, 0)
+        nr = 0
+        while True:
+            try:
+                b = self._queue.get_nowait(block)
+                self._queue.task_done()
+                assert b is not None
+            except (Empty, AssertionError):
+                if len(arrays):
+                    break
+                raise
+
+            arrays.append(b)
+
+            nr += len(b) // self.itemsize
+            if nr >= nreads:  # enough read
+                if n < 0:
+                    block = False  # keep reading until queue is empty
+                else:
+                    break
+
+        # combine all the data and return requested amount
+        all_data = b"".join(arrays)
+        if n <= 0:
+            return all_data
+        nbytes = self.itemsize * n
+        if len(all_data) > nbytes:
+            self._carryover = all_data[nbytes:]
+        return all_data[:nbytes]
+
     def read(self, n: int = -1, timeout: float | None = None) -> bytes:
         """read n samples
 
