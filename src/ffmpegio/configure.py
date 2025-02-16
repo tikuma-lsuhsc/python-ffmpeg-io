@@ -981,7 +981,7 @@ def resolve_raw_output_streams(
                 "media_type": stream_type_to_media_type(
                     opt["stream_specifier"].get("stream_type", None)
                 ),
-                "input_file_id": opt.get("input_file_id", None),
+                "input_file_id": opt["input_file_id"],
                 "input_stream_id": None,
             }
             for spec, opt in zip(streams, map_options)
