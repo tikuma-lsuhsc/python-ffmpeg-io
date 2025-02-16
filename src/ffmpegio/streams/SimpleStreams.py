@@ -11,6 +11,7 @@ from typing import Literal
 from fractions import Fraction
 from .._typing import RawDataBlob
 from ..filtergraph.abc import FilterGraphObject
+from ..errors import FFmpegioError
 
 from .. import utils, configure, ffmpegprocess, plugins
 from ..threading import LoggerThread, ReaderThread, WriterThread
@@ -647,6 +648,8 @@ class SimpleFilterBase:
 
     """
 
+    stream_type: Literal["a", "v"]
+
     # fmt:off
     def _set_options(self, options, shape, dtype, rate=None, expr=None): ...
     def _pre_open(self, ffmpeg_args): ...
@@ -654,12 +657,23 @@ class SimpleFilterBase:
     # fmt:on
 
     def __init__(
-        # fmt:off
-        self, converter, data_viewer, info_viewer, expr, rate_in, shape_in=None, dtype_in=None, 
-        rate=None, shape=None, dtype=None, blocksize=None, default_timeout=None,
-        progress=None, show_log=None,         sp_kwargs=None,
-**options,
-        # fmt:on
+        self,
+        converter,
+        data_viewer,
+        info_viewer,
+        expr,
+        rate_in,
+        shape_in=None,
+        dtype_in=None,
+        rate=None,
+        shape=None,
+        dtype=None,
+        blocksize=None,
+        default_timeout=None,
+        progress=None,
+        show_log=None,
+        sp_kwargs=None,
+        **options,
     ) -> None:
         if not rate_in:
             if rate:
@@ -685,13 +699,13 @@ class SimpleFilterBase:
         self.rate = rate
 
         #:str: input array dtype
-        self.dtype_in = None
+        self.dtype_in = dtype_in
         #:tuple(int): input array shape
-        self.shape_in = None
+        self.shape_in = shape_in
         #:str: output array dtype
-        self.dtype = None
+        self.dtype = dtype
         #:tuple(int): output array shape
-        self.shape = None
+        self.shape = shape
 
         self.nin = 0  #:int: total number of input samples sent to FFmpeg
         self.nout = 0  #:int: total number of output sampless received from FFmpeg
@@ -703,31 +717,24 @@ class SimpleFilterBase:
 
         self._proc = None
 
-        ffmpeg_args = configure.empty()
-        inopts = configure.add_url(
-            ffmpeg_args, "input", "-", utils.pop_extra_options(options, "_in")
-        )[1][1]
-        outopts = configure.add_url(ffmpeg_args, "output", "-", options)[1][1]
+        inopts = utils.pop_extra_options(options, "_in")
+        glopts = utils.pop_global_options(options)
 
-        # configuration process
-        # 1. during __init__
-        # 1.0. set filter
-        # 1.1. if dtype_in or shape_in is given, deduce the input options
-        # 1.2. if dtype or shape is given, deduce the output options
-        # 1.3. if input options are incomplete, defer starting the FFmpeg until
-        #      the first data block is given
-        # 2. during _open
-        # 2.1. if data is given (i.e., input was not completely defined)
-        # 2.1.1. get dtype_in and shape_in from data
-        # 2.1.2. deduce the input ffmpeg options
-        # 2.2. start ffmpeg
-        # 2.3. start reader if dtype & shape are already set
+        try:
+            not_ready, self.shape_in, self.dtype_in = self._set_options(
+                inopts, shape_in, dtype_in, rate_in
+            )
+        except FFmpegioError as exc:
+            raise FFmpegioError(
+                exc.args[0].replace("dtype", "dtype_in").replace("shape", "shape_in")
+            ) from exc
 
-        self.shape_in, self.dtype_in = self._set_options(
-            inopts, shape_in, dtype_in, rate_in
-        )
+        self._set_options(options, shape, dtype, rate, expr)
+        self._output_opts = options
 
-        self.shape, self.dtype = self._set_options(outopts, shape, dtype, rate, expr)
+        ffmpeg_args = configure.empty(glopts)
+        self._input_info = configure.process_raw_inputs(ffmpeg_args, [inopts], {})
+        configure.assign_input_url(ffmpeg_args, 0, "pipe:0")
 
         # create the stdin writer without assigning the sink stream
         self._writer = WriterThread(None, 0)
@@ -751,20 +758,27 @@ class SimpleFilterBase:
         )
 
         # if input is fully configured, start FFmpeg now
-        if self.shape_in is not None and self.dtype_in is not None:
+        if not not_ready:
             self._open()
 
     def _open(self, data=None):
         ffmpeg_args = self._cfg["ffmpeg_args"]
+        in_opts = ffmpeg_args["inputs"][0][1]
 
-        # if data array is given, finalize the FFmpeg configuration with it
+        # if data array is given, finalize input options (updates the initial options)
         if data is not None:
-            self.shape_in, self.dtype_in = self._set_options(
-                ffmpeg_args["inputs"][0][1], *self._infoviewer(obj=data)
+            _, self.shape_in, self.dtype_in = self._set_options(
+                in_opts, *self._infoviewer(obj=data)
             )
 
-        # final argument tweak before opening the ffmpeg
-        self._pre_open(ffmpeg_args)
+        # add the output pipe
+        self.dtype, self.shape, self.rate = configure.process_raw_outputs(
+            ffmpeg_args,
+            self._input_info,
+            [f"0:{self.stream_type}:0"],
+            self._output_opts,
+        )[0]["media_info"]
+        configure.assign_output_url(ffmpeg_args, 0, "pipe:1")
 
         # start FFmpeg
         self._proc = ffmpegprocess.Popen(**self._cfg)
@@ -954,29 +968,29 @@ class SimpleFilterBase:
         self.nout += len(y) // self._bps_out
         return self._converter(b=y, dtype=self.dtype, shape=self.shape, squeeze=False)
 
-    def flush(self, timeout=None):
+    def flush(self, timeout: float = None) -> RawDataBlob:
         """Close the stream input and retrieve the remaining output samples
 
         :param timeout: timeout duration in seconds, defaults to None
-        :type timeout: float, optional
         :return: remaining output samples
-        :rtype: numpy.ndarray
         """
 
         timeout = timeout or self.default_timeout
 
         # If no input, close stdin and read all remaining frames
-        y = self._reader.read_all(timeout)
-        self._proc.stdin.close()
+        self._writer.write(None)  # sentinel message
+        self._writer.join()  # wait until all written data reaches FFmpeg
+        self._proc.stdin.close()  # close stdin -> triggers ffmpeg to shutdown
         self._proc.wait()
-        self._reader.cool_down()
-        nbytes = len(y)
-        while nbytes:
-            y1 = self._reader.read_all(None)
-            nbytes = len(y1)
-            y += y1
-        self.nout += len(y) // self._bps_out
-        return self._converter(b=y, dtype=self.dtype, shape=self.shape, squeeze=False)
+        y = self._reader.read_all(timeout) # read whatever is left in the read queue
+        nframes = len(y) // self._bps_out
+        self.nout += nframes
+        return self._converter(
+            b=y[: nframes * self._bps_out],
+            dtype=self.dtype,
+            shape=self.shape,
+            squeeze=False,
+        )
 
 
 class SimpleVideoFilter(SimpleFilterBase):
@@ -1020,6 +1034,7 @@ class SimpleVideoFilter(SimpleFilterBase):
     writable = True
     multi_read = False
     multi_write = False
+    stream_type = "v"
 
     def __init__(
         # fmt:off
@@ -1051,30 +1066,54 @@ class SimpleVideoFilter(SimpleFilterBase):
         dtype: str | None,
         rate: Fraction | int | None = None,
         expr: FilterGraphObject | None = None,
-    ) -> tuple[tuple[int, ...], str]:
+    ) -> tuple[bool, tuple[int, ...], str]:
 
-        if rate:
+        pix_fmt = options.get("pix_fmt", None)
+        s = options.get("s", None)
+
+        if (
+            dtype is None
+            and pix_fmt is not None
+            and (s is not None or shape is not None)
+        ):
+            if shape is not None and s is None:
+                s = shape[2::-1]
+            if pix_fmt is not None and s is not None:
+                dtype_alt, shape_alt = utils.get_video_format(pix_fmt, s)
+                if dtype is not None and dtype != dtype_alt:
+                    raise FFmpegioError(
+                        f"Specifid {dtype=} and {pix_fmt=} are not compatible."
+                    )
+                if shape is not None and shape != shape_alt:
+                    raise FFmpegioError(
+                        f"Specifid {shape=}, {s=}, and {pix_fmt=} are not compatible."
+                    )
+        elif (pix_fmt is None or s is None) and dtype is not None and shape:
+            s_alt, pix_fmt_alt = utils.guess_video_format(shape, dtype)
+            if s is None:
+                s = s_alt
+            elif s != s_alt:
+                raise FFmpegioError(
+                    f"Specifid {dtype=}, {shape=}, and {s=} are not compatible."
+                )
+            if pix_fmt is None:
+                pix_fmt = pix_fmt_alt
+            elif pix_fmt != pix_fmt_alt:
+                raise FFmpegioError(
+                    f"Specifid {dtype=}, {shape=}, and {pix_fmt=} are not compatible."
+                )
+
+        options["f"] = "rawvideo"
+        if rate is not None:
             options["r"] = rate
         if expr is not None:
             options["vf"] = expr
+        if s is not None:
+            options["s"] = s
+        if pix_fmt is not None:
+            options["pix_fmt"] = pix_fmt
 
-        options["f"] = "rawvideo"
-
-        if shape is None or dtype is None:
-            # deduce them from options
-            if shape is not None or dtype is not None:
-                logger.warn(
-                    "[SimpleVideoFilter] both dtype and shape must be defined for the arguments to take effect."
-                )
-
-            try:
-                dtype, shape = utils.get_video_format(options["pix_fmt"], options["s"])
-            except:
-                return None, None
-        else:
-            options["s"], options["pix_fmt"] = utils.guess_video_format(shape, dtype)
-
-        return shape, dtype
+        return pix_fmt is None or s is None, shape, dtype
 
     def _finalize_output(self, info):
         # finalize array setup from FFmpeg log
@@ -1131,6 +1170,7 @@ class SimpleAudioFilter(SimpleFilterBase):
     writable = True
     multi_read = False
     multi_write = False
+    stream_type = "a"
 
     def __init__(
         self,
@@ -1169,26 +1209,49 @@ class SimpleAudioFilter(SimpleFilterBase):
         dtype: str | None,
         rate: Fraction | int | None = None,
         expr: FilterGraphObject | None = None,
-    ) -> tuple[tuple[int], str]:
+    ) -> tuple[bool, tuple[int], str]:
+
+        ac = options.get("ac", None)
 
         if shape is None:
-            try:
-                shape = (options["ac"],)
-            except:
-                shape = None
-        else:
-            options["ac"] = shape[-1]
+            if ac is not None:
+                shape = (ac,)
+        elif ac is None:
+            ac = shape[-1]
+        elif shape[-1] != ac:
+            raise FFmpegioError(f"{shape=} and {ac=} does not match")
 
-        if dtype is None:
-            try:
-                dtype, _ = utils.get_audio_format(options["sample_fmt"])
-            except:
-                dtype = None
-        else:
-            options["sample_fmt"], _ = utils.guess_audio_format(dtype)
-            options["c:a"], options["f"] = utils.get_audio_codec(options["sample_fmt"])
+        sample_fmt = options.get("sample_fmt", None)
+        if dtype is None and sample_fmt is not None:
+            if sample_fmt is not None:
+                dtype_alt, _ = utils.get_audio_format(options["sample_fmt"])
+                if dtype is None:
+                    dtype = dtype_alt
+                elif dtype != dtype_alt:
+                    raise FFmpegioError(
+                        f"Specifid {dtype=} and {pix_fmt=} are not compatible."
+                    )
+        elif (sample_fmt is None) and (dtype is not None):
+            sample_fmt_alt, _ = utils.guess_audio_format(dtype)
+            if sample_fmt is None:
+                sample_fmt = sample_fmt_alt
+            elif sample_fmt != sample_fmt_alt:
+                raise FFmpegioError(
+                    f"Specifid {dtype=} and {sample_fmt=} are not compatible."
+                )
 
-        return shape, dtype
+        options["f"] = "rawvideo"
+        if rate:
+            options["ar"] = rate
+        if expr is not None:
+            options["af"] = expr
+        if sample_fmt is not None:
+            options["sample_fmt"] = sample_fmt
+            options["c:a"], options["f"] = utils.get_audio_codec(sample_fmt)
+        if ac is not None:
+            options["ac"] = ac
+
+        return sample_fmt is None or ac is None, shape, dtype
 
     def _finalize_output(self, info):
         # finalize array setup from FFmpeg log
