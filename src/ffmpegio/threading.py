@@ -866,6 +866,8 @@ class CopyFileObjThread(Thread):
     :param length: The integer length, if given, is the buffer size. In particular, a negative length
                     value means to copy the data without looping over the source data in chunks;
                     defaults to 0; the data is read in chunks to avoid uncontrolled memory consumption.
+    :param auto_close: True for the thread to close fsrc and fdst after copy,
+                       defaults to False
 
     Thread terminates when the copy operation is completed.
 
@@ -874,13 +876,18 @@ class CopyFileObjThread(Thread):
     """
 
     def __init__(
-        self, fsrc: BinaryIO | NPopen, fdst: BinaryIO | NPopen, length: int = 0
+        self,
+        fsrc: BinaryIO | NPopen,
+        fdst: BinaryIO | NPopen,
+        length: int = 0,
+        *,
+        auto_close: bool = False,
     ):
-
         super().__init__()
         self._fsrc = fsrc
         self._fdst = fdst
         self.length = length
+        self.auto_close = auto_close
 
     def __enter__(self):
         self.start()
@@ -896,3 +903,6 @@ class CopyFileObjThread(Thread):
         dst_is_namedpipe = isinstance(self._fdst, NPopen)
         dst = self._fdst.wait() if dst_is_namedpipe else self._fdst
         copyfileobj(src, dst, self.length)
+        if self.auto_close:
+            src.close()
+            dst.close()
