@@ -144,7 +144,7 @@ def merge_audio(
 
 
 def temp_video_src(r, pix_fmt, s):
-    return fgb.color(s=s, r=r) + fgb.format(pix_fmts=pix_fmt)
+    return fgb.color(s=f"{s[0]}x{s[1]}", r=r) + fgb.format(pix_fmts=pix_fmt)
 
 
 def temp_audio_src(ar, sample_fmt, ac):
