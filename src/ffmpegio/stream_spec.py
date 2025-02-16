@@ -309,11 +309,14 @@ def stream_spec(
 
 
 def parse_map_option(
-    map: str, *, input_file_id: int | None = None, parse_stream: bool = False
+    map: str | tuple[int, str],
+    *,
+    input_file_id: int | None = None,
+    parse_stream: bool = False,
 ) -> MapOptionDict:
     """parse the FFmpeg -map option str
 
-    :param map: option string value
+    :param map: option string value, optionally a tuple of a file id and a stream specifier.
     :param input_file_id: if specified, auto-insert this id if a file id is missing in the given value,
                           defaults to None to error out if missing.
     :param parse_stream: True to also parse stream spec (if given)
@@ -327,6 +330,9 @@ def parse_map_option(
 
     See the FFmpeg manual for the specification: https://ffmpeg.org/ffmpeg.html#Advanced-options
     """
+
+    if isinstance(map, tuple):
+        map = f"{map[0]}:{map[1]}"
 
     map = str(map)
 
