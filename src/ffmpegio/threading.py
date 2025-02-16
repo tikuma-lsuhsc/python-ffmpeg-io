@@ -337,10 +337,13 @@ class ReaderThread(Thread):
         blocksize = (
             self.nmin if self.nmin is not None else 1 if self.itemsize > 1024 else 1024
         ) * self.itemsize
+        logger.debug("waiting for pipe to open")
         stream = self.stdout.wait() if is_npipe else self.stdout
+        logger.debug("starting to read")
         while self._collect:
             try:
                 data = stream.read(blocksize)
+                logger.debug("read %d bytes", len(data))
             except:
                 # stdout stream closed/FFmpeg terminated, end the thread as well
                 data = None
@@ -358,6 +361,8 @@ class ReaderThread(Thread):
             if self._collect:  # True until self.cooloff
                 self._queue.put(data)
                 # print(f"reader thread: queued samples")
+
+        logger.debug("stopping to read")
 
         if self._collect:  # True until self.cooloff
             logger.info("ReaderThread sending the sentinel")
