@@ -41,7 +41,7 @@ from .stream_spec import (
     StreamSpecDict,
     stream_type_to_media_type,
     parse_map_option,
-    map_option as compose_map_option
+    map_option as compose_map_option,
 )
 from .errors import FFmpegioError
 
@@ -1061,9 +1061,19 @@ def auto_map(
             for linklabel, media_type in analyze_fg_outputs(args).items()
         }
 
+    counter = {"file": None, "audio": 0, "video": 0}
+
+    def next_map_option(i, media_type):
+        if i != counter["file"]:
+            counter["audio"] = counter["video"] = 0
+            counter["file"] = i
+        j = counter[media_type]
+        counter[media_type] = j + 1
+        return f"{i}:{media_type[0]}:{j}"
+
     # if no filtergraph, get all video & audio streams from all the input urls
     return {
-        f"{i}:{j}": {
+        next_map_option(i, media_type): {
             "dst_type": "pipe",
             "user_map": None,
             "media_type": media_type,
