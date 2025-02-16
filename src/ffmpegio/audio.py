@@ -69,6 +69,7 @@ def _run_read(
         info = log_utils.extract_output_stream(out.stderr)
 
         ac = info.get("ac", None)
+        ac = ac and (ac,)
         rate = info.get("ar", None)
     else:
         out = ffmpegprocess.run(
@@ -80,7 +81,7 @@ def _run_read(
             raise FFmpegError(out.stderr, show_log)
 
     return rate, plugins.get_hook().bytes_to_audio(
-        b=out.stdout, dtype=dtype, shape=(ac,), squeeze=False
+        b=out.stdout, dtype=dtype, shape=ac, squeeze=False
     )
 
 

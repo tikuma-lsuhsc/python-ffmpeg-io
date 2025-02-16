@@ -471,12 +471,15 @@ def finalize_audio_read_opts(
     args: FFmpegArgs,
     ofile: int = 0,
     input_info: list[InputSourceDict] = [],
-) -> tuple[str, int | None, int | None]:
+) -> tuple[str, tuple[int] | None, int | None]:
     """finalize a raw output audio stream
 
     :param args: FFmpeg arguments. The option dict in args['outputs'][ofile][1] may be modified.
     :param ofile: output file index, defaults to 0
     :param input_info: list of input information, defaults to None
+    :return dtype: input data type (Numpy style)
+    :return ac: number of channels
+    :return ar: sampling rate
 
     * Possible Output Options Modification
       - "f" and "c:a" - raw audio format and codec will always be set
@@ -570,7 +573,7 @@ def finalize_audio_read_opts(
     # sample_fmt must be given
     dtype, _ = utils.get_audio_format(sample_fmt, ac)
 
-    return dtype, ac, ar
+    return dtype, ac and (ac,), ar
 
 
 ################################################################################

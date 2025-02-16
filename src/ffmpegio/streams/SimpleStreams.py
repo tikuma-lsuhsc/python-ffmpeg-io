@@ -293,7 +293,7 @@ class SimpleAudioReader(SimpleReaderBase):
         outopts["map"] = "0:a:0"
         (
             self.dtype,
-            ac,
+            self.shape,
             self.rate,
         ) = configure.finalize_audio_read_opts(
             ffmpeg_args,
@@ -305,9 +305,6 @@ class SimpleAudioReader(SimpleReaderBase):
                 }
             ],
         )
-
-        if ac is not None:
-            self.shape = (ac,)
 
     def _finalize_array(self, info):
         # finalize array setup from FFmpeg log
