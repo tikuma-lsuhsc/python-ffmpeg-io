@@ -309,10 +309,6 @@ class ReaderThread(Thread):
     def cool_down(self):
         # stop enqueue read samples
         self._collect = False
-        try:
-            self._queue.get_nowait()
-        except:
-            pass
 
     def join(self, timeout=None):
         if self._queue.full():
