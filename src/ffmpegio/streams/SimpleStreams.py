@@ -1,9 +1,16 @@
+"""SimpleStreams Module: FFmpeg"""
+
 from __future__ import annotations
 
 from time import time
 import logging
 
 logger = logging.getLogger("ffmpegio")
+
+from typing import Literal
+from fractions import Fraction
+from .._typing import RawDataBlob
+from ..filtergraph.abc import FilterGraphObject
 
 from .. import utils, configure, ffmpegprocess, plugins
 from ..threading import LoggerThread, ReaderThread, WriterThread
@@ -1037,7 +1044,15 @@ class SimpleVideoFilter(SimpleFilterBase):
             ffmpeg_args, configure.check_alpha_change(ffmpeg_args, -1)
         )
 
-    def _set_options(self, options, shape, dtype, rate=None, expr=None):
+    def _set_options(
+        self,
+        options: dict,
+        shape: tuple[int] | None,
+        dtype: str | None,
+        rate: Fraction | int | None = None,
+        expr: FilterGraphObject | None = None,
+    ) -> tuple[tuple[int, ...], str]:
+
         if rate:
             options["r"] = rate
         if expr is not None:
@@ -1147,11 +1162,14 @@ class SimpleAudioFilter(SimpleFilterBase):
             sample_fmt = outopts["sample_fmt"] = inopts["sample_fmt"]
             outopts["c:a"], outopts["f"] = utils.get_audio_codec(sample_fmt)
 
-    def _set_options(self, options, shape, dtype, rate=None, expr=None):
-        if rate:
-            options["ar"] = rate
-        if expr is not None:
-            options["af"] = expr
+    def _set_options(
+        self,
+        options: dict,
+        shape: tuple[int] | None,
+        dtype: str | None,
+        rate: Fraction | int | None = None,
+        expr: FilterGraphObject | None = None,
+    ) -> tuple[tuple[int], str]:
 
         if shape is None:
             try:

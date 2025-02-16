@@ -1,4 +1,5 @@
 """ffmpegio object independent common type hints"""
+
 from __future__ import annotations
 
 from typing import *
@@ -48,4 +49,3 @@ class InputSourceDict(TypedDict):
     buffer: NotRequired[bytes]  # index of the source index
     fileobj: NotRequired[IO]  # file object
     pipe: NotRequired[NPopen]  # pipe
-

@@ -216,7 +216,9 @@ def add_url(
     n = len(filelist)
 
     # if updating, get the existing id
-    file_id = next((i for i in range(n) if filelist[i][0] == url), None) if update else None
+    file_id = (
+        next((i for i in range(n) if filelist[i][0] == url), None) if update else None
+    )
     if file_id is None:
         # new entry
         file_id = n
@@ -228,7 +230,11 @@ def add_url(
             (
                 opts
                 if filelist[file_id][1] is None
-                else (filelist[file_id][1] if opts is None else {**filelist[file_id][1], **opts})
+                else (
+                    filelist[file_id][1]
+                    if opts is None
+                    else {**filelist[file_id][1], **opts}
+                )
             ),
         )
     return file_id, filelist[file_id]
@@ -296,9 +302,9 @@ def finalize_video_read_opts(
     outmap = outopts["map"]
     outmap_fields = parse_map_option(outmap)
     has_simple_filter = "vf" in outopts or "filter:v" in outopts
-    fill_color = outopts.get('fill_color',None)
-    if fill_color is not None and 'remove_alpha' not in outopts:
-        outopts.pop('fill_color')
+    fill_color = outopts.get("fill_color", None)
+    if fill_color is not None and "remove_alpha" not in outopts:
+        outopts.pop("fill_color")
 
     # use the output option by default
     opt_vals = [outopts.get(o, None) for o in options]
@@ -382,7 +388,6 @@ def finalize_video_read_opts(
             if remove_alpha:
                 # append the remove-video-alpha filter chain
                 build_basic_vf(args, True, ofile)
-
 
     outopts["f"] = "rawvideo"
 

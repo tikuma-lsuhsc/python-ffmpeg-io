@@ -8,6 +8,7 @@ from ..stream_spec import StreamSpecDict
 from .abc import FilterGraphObject
 
 from functools import reduce
+from fractions import Fraction
 
 from .. import filtergraph as fgb
 
@@ -143,11 +144,25 @@ def merge_audio(
     return (afilt >> output_pad_label) if output_pad_label else afilt
 
 
-def temp_video_src(r, pix_fmt, s):
+def temp_video_src(r: int | Fraction, pix_fmt: str, s: tuple[int, int]) -> fgb.Chain:
+    """temporary video source
+
+    :param r: frame rate
+    :param pix_fmt: pixel format
+    :param s: frame shape (width x height)
+    :return: a chain of color and format filters
+    """
     return fgb.color(s=f"{s[0]}x{s[1]}", r=r) + fgb.format(pix_fmts=pix_fmt)
 
 
-def temp_audio_src(ar, sample_fmt, ac):
+def temp_audio_src(ar: int, sample_fmt: str, ac: int) -> fgb.Chain:
+    """temporary audio source
+
+    :param ar: sampling rate
+    :param sample_fmt: sample format
+    :param ac: number of channels
+    :return: a chain of aevalsrc and aformat
+    """
     return fgb.aevalsrc("|".join(["0"] * ac)) + fgb.aformat(
         sample_fmts=sample_fmt or "dbl", r=ar
     )
