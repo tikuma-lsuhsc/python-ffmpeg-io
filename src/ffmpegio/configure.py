@@ -41,6 +41,7 @@ from .stream_spec import (
     StreamSpecDict,
     stream_type_to_media_type,
     parse_map_option,
+    map_option as compose_map_option
 )
 from .errors import FFmpegioError
 
@@ -974,7 +975,7 @@ def resolve_raw_output_streams(
     ):
         # no need to run the stream mapping analysis
         return {
-            spec: {
+            compose_map_option(**opt): {
                 "dst_type": dst_type,
                 "user_map": spec,
                 "media_type": stream_type_to_media_type(
